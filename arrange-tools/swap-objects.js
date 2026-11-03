@@ -122,8 +122,8 @@ function buildDialog(Dialog) {
     const dlg = Dialog.create("Swap Objects");
     const col = dlg.addColumn();
     const grp = col.addGroup("");
-    dlg.swapSizes = grp.addCheckBox("Swap Sizes", false);
-    dlg.swapColours = grp.addCheckBox("Swap Colours", false);
+    dlg.swapSizes = grp.addCheckBox("Swap Sizes", false).setIsFullWidth(true);
+    dlg.swapColours = grp.addCheckBox("Swap Colours", false).setIsFullWidth(true);
     return dlg;
 }
 

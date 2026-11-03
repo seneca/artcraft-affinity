@@ -200,7 +200,7 @@ function buildDialog(Dialog, doc, defaultColumns) {
     dlg.columnsEditor = grp.addUnitValueEditor("Columns:", UnitType.Number, UnitType.Number, defaultColumns, 1, CONFIG.MAX_COLUMNS).setPrecision(0);
     dlg.gapX = grp.addUnitValueEditor("H Spacing:", UnitType.Point, doc.units, CONFIG.DEFAULT_GAP_PT, CONFIG.GAP_MIN_PT, CONFIG.GAP_MAX_PT).setShowPopupSlider(true);
     dlg.gapY = grp.addUnitValueEditor("V Spacing:", UnitType.Point, doc.units, CONFIG.DEFAULT_GAP_PT, CONFIG.GAP_MIN_PT, CONFIG.GAP_MAX_PT).setShowPopupSlider(true);
-    dlg.center = grp.addCheckBox("Center on Artboard", false);
+    dlg.center = grp.addCheckBox("Center on Artboard", false).setIsFullWidth(true);
 
     const updateColumnsEnabled = () => { dlg.columnsEditor.isEnabled = dlg.layoutChoice.selectedIndex === 0; };
     dlg.layoutChoice.onValueChangedHandler = updateColumnsEnabled;
