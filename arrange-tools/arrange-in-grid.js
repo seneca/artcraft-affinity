@@ -145,8 +145,8 @@ function buildDialog(doc, defaultColumns) {
     const grp = col.addGroup("");
     dlg.layoutChoice = grp.addComboBox("Layout:", ["Grid by Row", "Arrange by Row", "Arrange by Column"], 0);
     dlg.columnsEditor = grp.addUnitValueEditor("Columns:", UnitType.Number, UnitType.Number, defaultColumns, 1, MAX_COLUMNS).setPrecision(0);
-    dlg.gapX = grp.addUnitValueEditor("H Spacing:", UnitType.Point, doc.units, 10, -GAP_LIMIT, GAP_LIMIT);
-    dlg.gapY = grp.addUnitValueEditor("V Spacing:", UnitType.Point, doc.units, 10, -GAP_LIMIT, GAP_LIMIT);
+    dlg.gapX = grp.addUnitValueEditor("H Spacing:", UnitType.Point, doc.units, 10, -GAP_LIMIT, GAP_LIMIT).setShowPopupSlider(true);
+    dlg.gapY = grp.addUnitValueEditor("V Spacing:", UnitType.Point, doc.units, 10, -GAP_LIMIT, GAP_LIMIT).setShowPopupSlider(true);
     dlg.center = grp.addCheckBox("Center on Artboard", false);
 
     const updateColumnsEnabled = () => { dlg.columnsEditor.isEnabled = dlg.layoutChoice.selectedIndex === 0; };
