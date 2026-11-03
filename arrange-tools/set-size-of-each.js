@@ -155,17 +155,19 @@ function buildDialog(Dialog, SpatialAnchor, UnitType, doc, defaultWidthPt, defau
     const grp = col.addGroup("");
     // A column stack puts each row's checkbox and field side by side (one lane per control, each
     // lane's first - and only - row aligning with the other's), matching VectorCraft's own
-    // checkbox+field row layout instead of stacking them as two separate full-width rows.
+    // checkbox+field row layout instead of stacking them as two separate full-width rows. Both the
+    // lane groups and the field's own label are left unnamed/empty: the checkbox's "Width"/"Height"
+    // is the row's only label, not repeated as a group title or a field label beside it.
     const widthRow = grp.addColumnStack();
-    dlg.widthCheck = widthRow.addColumn().addGroup().addCheckBox("Width", true).setIsFullWidth(true);
-    dlg.widthField = widthRow.addColumn().addGroup("Width")
-        .addUnitValueEditor("Width", UnitType.Point, doc.units, defaultWidthPt, CONFIG.SIZE_MIN_PT, CONFIG.SIZE_MAX_PT)
+    dlg.widthCheck = widthRow.addColumn().addGroup("").addCheckBox("Width", true).setIsFullWidth(true);
+    dlg.widthField = widthRow.addColumn().addGroup("")
+        .addUnitValueEditor("", UnitType.Point, doc.units, defaultWidthPt, CONFIG.SIZE_MIN_PT, CONFIG.SIZE_MAX_PT)
         .setShowPopupSlider(true);
 
     const heightRow = grp.addColumnStack();
-    dlg.heightCheck = heightRow.addColumn().addGroup().addCheckBox("Height", true).setIsFullWidth(true);
-    dlg.heightField = heightRow.addColumn().addGroup("Height")
-        .addUnitValueEditor("Height", UnitType.Point, doc.units, defaultHeightPt, CONFIG.SIZE_MIN_PT, CONFIG.SIZE_MAX_PT)
+    dlg.heightCheck = heightRow.addColumn().addGroup("").addCheckBox("Height", true).setIsFullWidth(true);
+    dlg.heightField = heightRow.addColumn().addGroup("")
+        .addUnitValueEditor("", UnitType.Point, doc.units, defaultHeightPt, CONFIG.SIZE_MIN_PT, CONFIG.SIZE_MAX_PT)
         .setShowPopupSlider(true);
     dlg.proportional = grp.addCheckBox("Constrain Width and Height Proportions", false).setIsFullWidth(true);
     dlg.reference = grp.addSpatialAnchor("Reference Point:", SpatialAnchor.Centre);
