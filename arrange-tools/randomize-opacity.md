@@ -2,6 +2,14 @@
 
 Gives each selected object its own random opacity, as one undo step.
 
+## Installation
+
+1. Open the Script Editor panel (**Window > Scripting > Script Editor**).
+2. Paste the contents of `randomize-opacity.js` into the editor and press
+   **Run** — or, to keep it around, click **Save As...** to save it to the
+   Script Library (**Window > Scripting > Script Library**), then click it
+   there to run it any time.
+
 ## Purpose
 
 Ported from VectorCraft's Arrange Tools > Randomize Opacity. Assigns each

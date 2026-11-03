@@ -3,6 +3,14 @@
 Sorts the selected objects by one attribute and gives them another, in that
 order, as one undo step.
 
+## Installation
+
+1. Open the Script Editor panel (**Window > Scripting > Script Editor**).
+2. Paste the contents of `sort-objects.js` into the editor and press **Run**
+   — or, to keep it around, click **Save As...** to save it to the Script
+   Library (**Window > Scripting > Script Library**), then click it there
+   to run it any time.
+
 ## Purpose
 
 Ported from VectorCraft's Arrange Tools > Sort Objects. Takes the selected

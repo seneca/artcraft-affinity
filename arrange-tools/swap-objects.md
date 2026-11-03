@@ -3,6 +3,14 @@
 Swaps the places of two selected objects, with optional size and colour
 swapping, as one undo step.
 
+## Installation
+
+1. Open the Script Editor panel (**Window > Scripting > Script Editor**).
+2. Paste the contents of `swap-objects.js` into the editor and press **Run**
+   — or, to keep it around, click **Save As...** to save it to the Script
+   Library (**Window > Scripting > Script Library**), then click it there
+   to run it any time.
+
 ## Purpose
 
 Unifies VectorCraft's Arrange Tools > Swap Objects and > Swap Objects and
