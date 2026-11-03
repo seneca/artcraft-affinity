@@ -408,11 +408,14 @@ function main() {
 
     const update = (preview) => {
         updateEnabled(dlg);
+        // Apply To "Stacking Order" reads the live sibling order to decide each group's moves (see
+        // buildStackingCommand); a prior preview's moves are still visibly in effect at that point; clearing
+        // first puts it back to the real, committed order so that read - and the "no move needed" check
+        // against each item's original position - are never done against a stale, already-previewed one.
+        doc.clearPreviews();
         const cmd = buildCommand(doc, items, readOptions(dlg, seed));
         if (cmd)
             doc.executeCommand(cmd, preview);
-        else
-            doc.clearPreviews();
         return cmd;
     };
 
