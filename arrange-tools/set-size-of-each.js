@@ -60,9 +60,11 @@ Contact:        lpruszynski@middledot.com
 // CONFIGURATION
 // ============================================================
 
+// SIZE_MAX_PT is kept well short of VectorCraft's engine-level 1,000,000pt clamp: that range makes
+// the popup slider unusable (see GAP_MIN_PT/GAP_MAX_PT in arrange-in-grid.js for the same tradeoff).
 const CONFIG = {
     SIZE_MIN_PT: 0.001,     // Width/Height fields' lower bound (pt), VectorCraft's addon.arrange.size spec
-    SIZE_MAX_PT: 1000000,   // Width/Height fields' upper bound (pt)
+    SIZE_MAX_PT: 5000,      // Width/Height fields' upper bound (pt) - about 69 inches
 };
 
 // Modules that clear the live selection when require()'d (/dialog among them) are loaded lazily,
@@ -151,10 +153,20 @@ function buildDialog(Dialog, SpatialAnchor, UnitType, doc, defaultWidthPt, defau
     const dlg = Dialog.create("Set Size of Each");
     const col = dlg.addColumn();
     const grp = col.addGroup("");
-    dlg.widthCheck = grp.addCheckBox("Width", true).setIsFullWidth(true);
-    dlg.widthField = grp.addUnitValueEditor("", UnitType.Point, doc.units, defaultWidthPt, CONFIG.SIZE_MIN_PT, CONFIG.SIZE_MAX_PT);
-    dlg.heightCheck = grp.addCheckBox("Height", true).setIsFullWidth(true);
-    dlg.heightField = grp.addUnitValueEditor("", UnitType.Point, doc.units, defaultHeightPt, CONFIG.SIZE_MIN_PT, CONFIG.SIZE_MAX_PT);
+    // A column stack puts each row's checkbox and field side by side (one lane per control, each
+    // lane's first - and only - row aligning with the other's), matching VectorCraft's own
+    // checkbox+field row layout instead of stacking them as two separate full-width rows.
+    const widthRow = grp.addColumnStack();
+    dlg.widthCheck = widthRow.addColumn().addGroup().addCheckBox("Width", true).setIsFullWidth(true);
+    dlg.widthField = widthRow.addColumn().addGroup("Width")
+        .addUnitValueEditor("Width", UnitType.Point, doc.units, defaultWidthPt, CONFIG.SIZE_MIN_PT, CONFIG.SIZE_MAX_PT)
+        .setShowPopupSlider(true);
+
+    const heightRow = grp.addColumnStack();
+    dlg.heightCheck = heightRow.addColumn().addGroup().addCheckBox("Height", true).setIsFullWidth(true);
+    dlg.heightField = heightRow.addColumn().addGroup("Height")
+        .addUnitValueEditor("Height", UnitType.Point, doc.units, defaultHeightPt, CONFIG.SIZE_MIN_PT, CONFIG.SIZE_MAX_PT)
+        .setShowPopupSlider(true);
     dlg.proportional = grp.addCheckBox("Constrain Width and Height Proportions", false).setIsFullWidth(true);
     dlg.reference = grp.addSpatialAnchor("Reference Point:", SpatialAnchor.Centre);
     dlg.scaleStrokes = grp.addCheckBox("Scale Strokes & Effects", true).setIsFullWidth(true);
