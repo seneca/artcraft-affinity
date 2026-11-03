@@ -60,20 +60,16 @@ const { Document } = require('/document.js');
 const { Transform } = require('/geometry.js');
 const { Selection } = require('/selections.js');
 
-function centreOf(rect) {
-    return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
-}
-
 // Moves `box`'s centre to `targetCentre`, keeping its own size.
 function translateTransform(box, targetCentre) {
-    const centre = centreOf(box);
+    const centre = box.centre;
     return Transform.createTranslate(targetCentre.x - centre.x, targetCentre.y - centre.y);
 }
 
 // Moves `box`'s centre to `targetCentre` and scales it to `targetSize`'s width/height -
 // equivalent to object.setBounds with reference point 4 (centre).
 function boundsTransform(box, targetCentre, targetSize) {
-    const centre = centreOf(box);
+    const centre = box.centre;
     const sx = targetSize.width / box.width;
     const sy = targetSize.height / box.height;
     return Transform.createTranslate(targetCentre.x, targetCentre.y)
@@ -94,11 +90,11 @@ function buildCommand(doc, a, b, state, opts) {
     let any = false;
 
     const xfA = opts.swapSizes
-        ? boundsTransform(state.boxA, centreOf(state.boxB), state.boxB)
-        : translateTransform(state.boxA, centreOf(state.boxB));
+        ? boundsTransform(state.boxA, state.boxB.centre, state.boxB)
+        : translateTransform(state.boxA, state.boxB.centre);
     const xfB = opts.swapSizes
-        ? boundsTransform(state.boxB, centreOf(state.boxA), state.boxA)
-        : translateTransform(state.boxB, centreOf(state.boxA));
+        ? boundsTransform(state.boxB, state.boxA.centre, state.boxA)
+        : translateTransform(state.boxB, state.boxA.centre);
 
     if (!isIdentity(xfA)) {
         builder.addCommand(DocumentCommand.createTransform(Selection.create(doc, a), xfA));

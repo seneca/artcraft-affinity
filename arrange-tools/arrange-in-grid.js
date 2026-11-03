@@ -116,10 +116,6 @@ function artboardAt(spread, pt) {
     return artboards.find(box => pointInRect(box, pt)) ?? artboards[0];
 }
 
-function centreOf(rect) {
-    return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
-}
-
 // Each item's move (dx, dy) to its grid cell centre, or null with nothing selected. `opts.gapX`
 // and `opts.gapY` must already be in document pixels (the same space as the items' boxes) -
 // see readOptions, which converts them from the points the dialog collects them in.
@@ -151,8 +147,8 @@ function computeMoves(doc, items, opts) {
 
     let originX, originY;
     if (opts.centerOnArtboard) {
-        const board = artboardAt(doc.currentSpread, centreOf(all)) ?? all;
-        const c = centreOf(board);
+        const board = artboardAt(doc.currentSpread, all.centre) ?? all;
+        const c = board.centre;
         originX = c.x - total(widths, opts.gapX) / 2;
         originY = c.y - total(heights, opts.gapY) / 2;
     }
@@ -175,7 +171,7 @@ function computeMoves(doc, items, opts) {
 
     return items.map((item, i) => {
         const c = i % cols, r = Math.floor(i / cols);
-        const centre = centreOf(item.box);
+        const centre = item.box.centre;
         return { node: item.node, dx: xs[c] - centre.x, dy: ys[r] - centre.y };
     });
 }
