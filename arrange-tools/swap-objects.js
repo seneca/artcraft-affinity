@@ -39,7 +39,13 @@ Description:    Unifies VectorCraft's Arrange Tools > Swap Objects and Swap Obje
                  variant) and Swap Colours (also swaps their fill and stroke colour/
                  fill descriptors; not part of VectorCraft, added per request). All
                  selected effects apply as one undo step. Bounds are measured
-                 visually (strokes and effects as drawn).
+                 visually (strokes and effects as drawn). Scale Strokes & Effects (only
+                 meaningful with Swap Sizes on) sets each object's own "Scale with
+                 object" stroke/effects setting to match (a lasting change, since
+                 Affinity has no per-operation equivalent); with it off and a stroke
+                 present, the resulting size is only approximate, since this script
+                 scales the geometric box directly rather than solving for the exact
+                 visual size as VectorCraft's own algorithm does.
 
 Author:         Les Pruszynski (Middledot)
 Version:        1.0.0
@@ -58,6 +64,7 @@ Contact:        lpruszynski@middledot.com
 const { CompoundCommandBuilder, DocumentCommand } = require('/commands.js');
 const { Document } = require('/document.js');
 const { Transform } = require('/geometry.js');
+const { LineStyleDescriptor, LineStyleMask } = require('/linestyle.js');
 const { Selection } = require('/selections.js');
 
 // Moves `box`'s centre to `targetCentre`, keeping its own size.
@@ -83,6 +90,20 @@ function isIdentity(xf) {
         Math.abs(d[3]) < 1e-9 && Math.abs(d[4] - 1) < 1e-9 && Math.abs(d[5]) < 1e-9;
 }
 
+// Affinity has no per-operation "scale strokes" transform option: a stroke's own "Scale with
+// object" (LineStyleDescriptor.isScale) and each layer effect's own scaleWithObject govern it
+// instead, read automatically by the renderer whenever a transform runs. Matching the Scale
+// Strokes & Effects checkbox for this swap means setting those - which, unlike VectorCraft's
+// per-operation preference, also persists on the object afterward.
+function applyScaleStrokes(doc, node, scaleOn, builder) {
+    const lsd = node.lineStyleDescriptor;
+    if (lsd.isScale !== scaleOn) {
+        const newDesc = LineStyleDescriptor.create(lsd.lineStyle, { isScale: scaleOn });
+        builder.addCommand(DocumentCommand.createSetLineStyleDescriptor(Selection.create(doc, node), newDesc, { lineStyleMask: LineStyleMask.Scale }));
+    }
+    builder.addCommand(DocumentCommand.createSetAllLayerEffectsScaleWithObject(Selection.create(doc, node), scaleOn));
+}
+
 // `a`/`b`'s pre-swap state is captured once in main() and passed in unchanged on every call -
 // never re-read from the nodes, since a preview already in effect would otherwise be compounded.
 function buildCommand(doc, a, b, state, opts) {
@@ -95,6 +116,12 @@ function buildCommand(doc, a, b, state, opts) {
     const xfB = opts.swapSizes
         ? boundsTransform(state.boxB, state.boxA.centre, state.boxA)
         : translateTransform(state.boxB, state.boxA.centre);
+
+    if (opts.swapSizes) {
+        applyScaleStrokes(doc, a, opts.scaleStrokes, builder);
+        applyScaleStrokes(doc, b, opts.scaleStrokes, builder);
+        any = true;
+    }
 
     if (!isIdentity(xfA)) {
         builder.addCommand(DocumentCommand.createTransform(Selection.create(doc, a), xfA));
@@ -124,11 +151,17 @@ function buildDialog(Dialog) {
     const grp = col.addGroup("");
     dlg.swapSizes = grp.addCheckBox("Swap Sizes", false).setIsFullWidth(true);
     dlg.swapColours = grp.addCheckBox("Swap Colours", false).setIsFullWidth(true);
+    dlg.scaleStrokes = grp.addCheckBox("Scale Strokes & Effects", true).setIsFullWidth(true);
     return dlg;
 }
 
+// Scale Strokes & Effects only means anything when sizes are actually swapped.
+function updateEnabled(dlg) {
+    dlg.scaleStrokes.isEnabled = dlg.swapSizes.value;
+}
+
 function readOptions(dlg) {
-    return { swapSizes: dlg.swapSizes.value, swapColours: dlg.swapColours.value };
+    return { swapSizes: dlg.swapSizes.value, swapColours: dlg.swapColours.value, scaleStrokes: dlg.scaleStrokes.value };
 }
 
 function main() {
@@ -160,6 +193,7 @@ function main() {
     const dlg = buildDialog(Dialog);
 
     const update = (preview) => {
+        updateEnabled(dlg);
         const cmd = buildCommand(doc, a, b, state, readOptions(dlg));
         if (cmd)
             doc.executeCommand(cmd, preview);

@@ -35,7 +35,12 @@ Script Name:    replace-with-top-object.js
 Description:    Ported from VectorCraft's Arrange Tools > Replace with Top Object. Puts a
                  copy of the frontmost selected object centred on each of the other selected
                  objects, in that object's place in the stacking order, as one undo step. Sizes
-                 and centres are measured by visual bounds (strokes and effects as drawn).
+                 and centres are measured by visual bounds (strokes and effects as drawn). Scale
+                 Strokes & Effects sets each copy's own "Scale with object" stroke/effects setting
+                 to match (a lasting change, since Affinity has no per-operation equivalent); with
+                 it off and a stroke present, the resulting size is only approximate, since this
+                 script scales the geometric box directly rather than solving for the exact visual
+                 size as VectorCraft's own algorithm does.
 
 Author:         Les Pruszynski (Middledot)
 Version:        1.0.0
@@ -54,6 +59,7 @@ Contact:        lpruszynski@middledot.com
 const { CompoundCommandBuilder, DocumentCommand, NodeChildType, NodeMoveType } = require('/commands.js');
 const { Document } = require('/document.js');
 const { Transform } = require('/geometry.js');
+const { LineStyleDescriptor, LineStyleMask } = require('/linestyle.js');
 const { Selection } = require('/selections.js');
 
 // The node's position among its siblings at every level up to the root, back (0) to front;
@@ -118,19 +124,36 @@ function boundsTransform(box, targetCentre, targetSize) {
         .multiply(Transform.createTranslate(-centre.x, -centre.y));
 }
 
+// Adjusts the live selection - the duplicate the transform just before this call created - to
+// match `scaleOn`'s stroke/effects scaling. Affinity has no per-operation "scale strokes" transform
+// option: a stroke's own "Scale with object" (LineStyleDescriptor.isScale) and each layer effect's
+// own scaleWithObject govern it instead, read automatically by the renderer whenever a transform
+// runs. `topLineStyle` is `top`'s own current descriptor - the duplicate starts out identical to
+// it, so that decides whether a change is even needed. Selection `null` (rather than a captured
+// one) means "whatever is currently selected": there is no JS reference to the not-yet-created
+// duplicate available while this compound is still being built, but it is the live selection
+// immediately after the preceding duplicating transform runs, and stays so through these two calls.
+function applyScaleStrokesToSelection(topLineStyle, scaleOn, builder) {
+    if (topLineStyle.isScale !== scaleOn) {
+        const newDesc = LineStyleDescriptor.create(topLineStyle.lineStyle, { isScale: scaleOn });
+        builder.addCommand(DocumentCommand.createSetLineStyleDescriptor(null, newDesc, { lineStyleMask: LineStyleMask.Scale }));
+    }
+    builder.addCommand(DocumentCommand.createSetAllLayerEffectsScaleWithObject(null, scaleOn));
+}
+
 // For each `other`, duplicates `top`, places the duplicate on `other`'s centre (sized per
 // `opts.fit`), moves it into `other`'s place in the stacking order, and - unless `opts.keep` -
-// deletes `other`. A duplicating transform makes its new node the document's live selection, which
-// is exactly what the following move picks up by being built with a null selection: there is no
-// JS reference to that not-yet-created node available while this compound is still being built.
+// deletes `other`.
 function buildCommand(doc, top, topBox, others, opts) {
     if (others.length === 0)
         return null;
+    const topLineStyle = top.lineStyleDescriptor;
     const builder = CompoundCommandBuilder.create();
     for (const { node: other, box: otherBox } of others) {
         const size = computeSize(opts.fit, topBox, otherBox);
         const xf = size ? boundsTransform(topBox, otherBox.centre, size) : translateTransform(topBox, otherBox.centre);
         builder.addCommand(DocumentCommand.createTransform(Selection.create(doc, top), xf, { duplicateNodes: true }));
+        applyScaleStrokesToSelection(topLineStyle, opts.scaleStrokes, builder);
         builder.addCommand(DocumentCommand.createMoveNodes(null, other, NodeMoveType.After, NodeChildType.Main));
         if (!opts.keep)
             builder.addCommand(DocumentCommand.createDeleteSelection(Selection.create(doc, other)));
@@ -146,16 +169,14 @@ function buildDialog(Dialog) {
     const grp = col.addGroup("");
     const fits = ["Actual Size", "Bounds", "Bounds (Fit Proportionally)"];
     dlg.fit = grp.addComboBox("Size:", fits, 0);
-    // VectorCraft's "Scale Strokes & Effects" checkbox has no counterpart here: the SDK exposes no
-    // app-level preference for it, and createTransform's duplicateNodes path has no stroke-scaling
-    // option a checkbox could drive.
     dlg.keep = grp.addCheckBox("Keep Original", false).setIsFullWidth(true);
+    dlg.scaleStrokes = grp.addCheckBox("Scale Strokes & Effects", true).setIsFullWidth(true);
     return dlg;
 }
 
 function readOptions(dlg) {
     const fits = ['keep', 'bounds', 'proportional'];
-    return { fit: fits[dlg.fit.selectedIndex] ?? 'keep', keep: dlg.keep.value };
+    return { fit: fits[dlg.fit.selectedIndex] ?? 'keep', keep: dlg.keep.value, scaleStrokes: dlg.scaleStrokes.value };
 }
 
 function main() {

@@ -37,7 +37,12 @@ Description:    Ported from VectorCraft's Arrange Tools > Set Size of Each. Give
                  corresponding visual bounds (strokes and effects as drawn), as one undo step. The
                  point of each object held fixed while it resizes is set by the Reference Point
                  (a 3x3 grid, as VectorCraft's own); with only one of width/height given, the other
-                 can follow it in proportion.
+                 can follow it in proportion. Scale Strokes & Effects sets each object's own
+                 "Scale with object" stroke/effects setting to match (a lasting change, since
+                 Affinity has no per-operation equivalent); with it off and a stroke present, the
+                 resulting size is only approximate, since this script scales the geometric box
+                 directly rather than solving for the exact visual size as VectorCraft's own
+                 algorithm does.
 
 Author:         Les Pruszynski (Middledot)
 Version:        1.0.0
@@ -65,6 +70,7 @@ const CONFIG = {
 const { CompoundCommandBuilder, DocumentCommand } = require('/commands.js');
 const { Document } = require('/document.js');
 const { Transform } = require('/geometry.js');
+const { LineStyleDescriptor, LineStyleMask } = require('/linestyle.js');
 const { Selection } = require('/selections.js');
 
 function clamp(v, lo, hi) {
@@ -110,20 +116,31 @@ function anchoredScaleTransform(box, anchorMap, anchorValue, size) {
         .multiply(Transform.createTranslate(-rp.x, -rp.y));
 }
 
-function buildCommand(doc, items, anchorMap, opts) {
-    const real = [];
-    for (const { node, box } of items) {
-        const xf = anchoredScaleTransform(box, anchorMap, opts.anchor, wantedSize(box, opts));
-        if (!isIdentity(xf))
-            real.push({ node, xf });
+// Affinity has no per-operation "scale strokes" transform option: a stroke's own "Scale with
+// object" (LineStyleDescriptor.isScale) and each layer effect's own scaleWithObject govern it
+// instead, read automatically by the renderer whenever a transform runs. Matching the Scale
+// Strokes & Effects checkbox for this resize means setting those - which, unlike VectorCraft's
+// per-operation preference, also persists on the object afterward.
+function applyScaleStrokes(doc, node, scaleOn, builder) {
+    const lsd = node.lineStyleDescriptor;
+    if (lsd.isScale !== scaleOn) {
+        const newDesc = LineStyleDescriptor.create(lsd.lineStyle, { isScale: scaleOn });
+        builder.addCommand(DocumentCommand.createSetLineStyleDescriptor(Selection.create(doc, node), newDesc, { lineStyleMask: LineStyleMask.Scale }));
     }
+    builder.addCommand(DocumentCommand.createSetAllLayerEffectsScaleWithObject(Selection.create(doc, node), scaleOn));
+}
+
+function buildCommand(doc, items, anchorMap, opts) {
+    const real = items
+        .map(({ node, box }) => ({ node, xf: anchoredScaleTransform(box, anchorMap, opts.anchor, wantedSize(box, opts)) }))
+        .filter(({ xf }) => !isIdentity(xf));
     if (real.length === 0)
         return null;
-    if (real.length === 1)
-        return DocumentCommand.createTransform(Selection.create(doc, real[0].node), real[0].xf);
     const builder = CompoundCommandBuilder.create();
-    for (const { node, xf } of real)
+    for (const { node, xf } of real) {
+        applyScaleStrokes(doc, node, opts.scaleStrokes, builder);
         builder.addCommand(DocumentCommand.createTransform(Selection.create(doc, node), xf));
+    }
     return builder.createCommand();
 }
 
@@ -138,11 +155,9 @@ function buildDialog(Dialog, SpatialAnchor, UnitType, doc, defaultWidthPt, defau
     dlg.widthField = grp.addUnitValueEditor("", UnitType.Point, doc.units, defaultWidthPt, CONFIG.SIZE_MIN_PT, CONFIG.SIZE_MAX_PT);
     dlg.heightCheck = grp.addCheckBox("Height", true).setIsFullWidth(true);
     dlg.heightField = grp.addUnitValueEditor("", UnitType.Point, doc.units, defaultHeightPt, CONFIG.SIZE_MIN_PT, CONFIG.SIZE_MAX_PT);
-    // VectorCraft's "Scale Strokes & Effects" checkbox has no counterpart here: the SDK exposes no
-    // app-level preference for it, and the transform this script builds has no stroke-scaling
-    // option a checkbox could drive.
     dlg.proportional = grp.addCheckBox("Constrain Width and Height Proportions", false).setIsFullWidth(true);
     dlg.reference = grp.addSpatialAnchor("Reference Point:", SpatialAnchor.Centre);
+    dlg.scaleStrokes = grp.addCheckBox("Scale Strokes & Effects", true).setIsFullWidth(true);
     return dlg;
 }
 
@@ -162,6 +177,7 @@ function readOptions(dlg, ptToPx) {
         height: dlg.heightField.value * ptToPx,
         proportional: dlg.proportional.value,
         anchor: dlg.reference.value,
+        scaleStrokes: dlg.scaleStrokes.value,
     };
 }
 
