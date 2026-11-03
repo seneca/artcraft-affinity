@@ -144,12 +144,12 @@ function buildDialog(doc, defaultColumns) {
     const col = dlg.addColumn();
     const grp = col.addGroup("");
     dlg.layoutChoice = grp.addComboBox("Layout:", ["Grid by Row", "Arrange by Row", "Arrange by Column"], 0);
-    dlg.columns = grp.addUnitValueEditor("Columns:", UnitType.Number, UnitType.Number, defaultColumns, 1, MAX_COLUMNS).setPrecision(0);
+    dlg.columnsEditor = grp.addUnitValueEditor("Columns:", UnitType.Number, UnitType.Number, defaultColumns, 1, MAX_COLUMNS).setPrecision(0);
     dlg.gapX = grp.addUnitValueEditor("H Spacing:", UnitType.Point, doc.units, 10, -GAP_LIMIT, GAP_LIMIT);
     dlg.gapY = grp.addUnitValueEditor("V Spacing:", UnitType.Point, doc.units, 10, -GAP_LIMIT, GAP_LIMIT);
     dlg.center = grp.addCheckBox("Center on Artboard", false);
 
-    const updateColumnsEnabled = () => { dlg.columns.isEnabled = dlg.layoutChoice.selectedIndex === 0; };
+    const updateColumnsEnabled = () => { dlg.columnsEditor.isEnabled = dlg.layoutChoice.selectedIndex === 0; };
     dlg.layoutChoice.onValueChangedHandler = updateColumnsEnabled;
     updateColumnsEnabled();
 
@@ -160,7 +160,7 @@ function readOptions(dlg) {
     const layouts = ['grid', 'row', 'column'];
     return {
         layout: layouts[dlg.layoutChoice.selectedIndex] ?? 'grid',
-        columns: Math.max(1, Math.round(dlg.columns.value)),
+        columns: Math.max(1, Math.round(dlg.columnsEditor.value)),
         gapX: dlg.gapX.value,
         gapY: dlg.gapY.value,
         centerOnArtboard: dlg.center.value
