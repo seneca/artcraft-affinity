@@ -48,6 +48,8 @@ Created:        03/11/2026
 Last updated:   03/11/2026
 Compatibility:  Affinity by Canva 3.3
 
+See replace-with-top-object.md for the full guide.
+
 Contact:        lpruszynski@middledot.com
 ================================================================================
 */

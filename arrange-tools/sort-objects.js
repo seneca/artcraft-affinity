@@ -56,10 +56,13 @@ Description:    Ported from VectorCraft's Arrange Tools > Sort Objects, plus one
                  document revision counter this SDK doesn't expose.
 
 Author:         Les Pruszynski (Middledot)
-Version:        1.0.0
+Version:        1.0.1
 Created:        03/11/2026
 Last updated:   03/11/2026
 Compatibility:  Affinity by Canva 3.3
+
+See sort-objects.md for the full guide, including a worked explanation of
+how Sort By and Apply To interact (and the guaranteed-no-op case).
 
 Contact:        lpruszynski@middledot.com
 ================================================================================
