@@ -1,7 +1,8 @@
 # combine-point-text
 
-Merges one-line point text objects that sit side by side into as few objects
-as it can, as one undo step.
+Merges one-line **Artistic Text** objects that sit side by side into as few
+objects as it can, as one undo step. Does not touch **Frame Text** - see
+Purpose.
 
 ## Installation
 
@@ -20,11 +21,19 @@ one line — but with a real difference from VectorCraft's own version: see
 Known Limitations before relying on this for anything where exact
 positioning matters.
 
+**Only Artistic Text** (what VectorCraft calls "point type" — the kind you
+get by clicking once with the Text tool, with no fixed box) is ever
+combined. **Frame Text** (the kind you get by dragging out a box with the
+Text tool) is always left exactly as it is, never merged, deleted or
+otherwise touched — matching VectorCraft's own tool, which only ever works
+on point type for the same reason: a text frame is one flowed paragraph in
+a fixed box already, not loose fragments to weld back together.
+
 ## How it works
 
-1. Looks at the selection's one-line, horizontal point text objects (inside
-   selected groups too). Multi-line text, text on a path, and frame text are
-   left alone.
+1. Looks at the selection's one-line, horizontal **Artistic Text** objects
+   (inside selected groups too). Frame Text, multi-line text, and text on a
+   path are left alone entirely.
 2. Groups them into **lines**: pieces that are rotated/scaled alike, look
    alike (same paint, opacity and blend mode), and whose bounding boxes sit
    at about the same height count as one line.
@@ -60,6 +69,10 @@ positioning matters.
   but different tool not yet ported here.
 
 ## Known limitations
+
+- **Frame Text is never combined, only Artistic Text.** This matches
+  VectorCraft's own tool exactly (it's a deliberate scope choice there too,
+  not an Affinity-specific gap) — see Purpose.
 
 **This is the one script in this project that can't make VectorCraft's own
 guarantee.** VectorCraft's Combine Point Text keeps every glyph exactly
