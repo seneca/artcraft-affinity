@@ -21,6 +21,7 @@ external dependencies. For any script in this folder:
 |---|---|
 | [`simplify-anchors.js`](simplify-anchors.md) | Removes as many anchors as it can from each selected path while keeping its outline shape. |
 | [`rejoin-path-pieces.js`](rejoin-path-pieces.md) | Welds open path pieces in the selection whose ends lie close together back into continuous paths. |
+| [`deep-ungroup.js`](deep-ungroup.md) | Dissolves every selected group, recursively, down to the objects actually inside them. |
 
 See each script's own `.md` guide (linked above) for its full Purpose, How
 it works, Features, Usage tips, Known limitations, and Changelog.
