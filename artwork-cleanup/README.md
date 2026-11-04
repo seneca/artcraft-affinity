@@ -20,6 +20,7 @@ external dependencies. For any script in this folder:
 | Script | What it does |
 |---|---|
 | [`simplify-anchors.js`](simplify-anchors.md) | Removes as many anchors as it can from each selected path while keeping its outline shape. |
+| [`rejoin-path-pieces.js`](rejoin-path-pieces.md) | Welds open path pieces in the selection whose ends lie close together back into continuous paths. |
 
 See each script's own `.md` guide (linked above) for its full Purpose, How
 it works, Features, Usage tips, Known limitations, and Changelog.
