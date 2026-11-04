@@ -139,7 +139,7 @@ function turnedAlike(a, b) {
 function isCombinable(node) {
     if (!node.isArtTextNode) return false;
     const text = node.text;
-    return text.trim() !== '' && !text.includes('\n') && !text.includes(' ') && !text.includes('\r');
+    return text.trim() !== '' && !text.includes('\n') && !text.includes('\u2028') && !text.includes('\r');
 }
 
 function collectCandidates(roots) {
