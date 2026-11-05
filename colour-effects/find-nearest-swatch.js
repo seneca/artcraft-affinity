@@ -61,7 +61,7 @@ Description:    Adapted port of VectorCraft's Colour Effects > Find Nearest Swat
                  relying on it.
 
 Author:         Les Pruszynski (Middledot)
-Version:        1.2.0
+Version:        1.2.1
 Created:        05/11/2026
 Last updated:   05/11/2026
 Compatibility:  Affinity by Canva 3.3
@@ -113,7 +113,7 @@ function buildDialog(Dialog, UnitType, defaults) {
 
     const scopeIndex = Math.max(0, SCOPE_KEYS.indexOf(defaults.paletteScope));
     dlg.scopeBox = grp.addComboBox('Match against', SCOPE_LABELS, scopeIndex);
-    dlg.countEditor = grp.addUnitValueEditor('Matches to report', UnitType.Number, UnitType.Number, defaults.count, 1, 50);
+    dlg.countEditor = grp.addUnitValueEditor('Matches to report', UnitType.Number, UnitType.Number, defaults.count, 1, 50).setPrecision(0);
     dlg.fillBox = grp.addCheckBox('Include fill colours', defaults.fill);
     dlg.strokeBox = grp.addCheckBox('Include stroke colours', defaults.stroke);
     // Live-updated from main() with a running summary - this script never changes the document

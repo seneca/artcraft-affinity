@@ -105,6 +105,8 @@ at once, across everything you choose.
 
 ## Changelog
 
+1.2.3 - The ink-limit/overprint-black fields show one decimal place
+(`setPrecision(1)`) instead of several.
 1.2.2 - Restored the ink-limit/overprint-black fields' popup sliders
 (briefly removed in 1.2.1) - the real cause of the live preview
 appearing not to work turned out to be a bug in vector-halftone.js's

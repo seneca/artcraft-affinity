@@ -112,6 +112,9 @@ is in each cell of a grid turned by your chosen screen angle.
 
 ## Changelog
 
+1.3.2 - Frequency and Angle show fewer decimal places (`setPrecision`)
+- Frequency (a whole number of lines per inch) now shows none at all,
+Angle shows one.
 1.3.1 - Found and fixed the actual reason Angle's slider couldn't be
 dragged at all: it had no explicit min/max, which (per /dialog.js's own
 source) gives the popup slider a zero-width range until a separate

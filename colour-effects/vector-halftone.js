@@ -77,7 +77,7 @@ Description:    Approximate port of VectorCraft's Colour Effects > Vector Halfto
                  relying on it.
 
 Author:         Les Pruszynski (Middledot)
-Version:        1.3.1
+Version:        1.3.2
 Created:        05/11/2026
 Last updated:   05/11/2026
 Compatibility:  Affinity by Canva 3.3
@@ -180,14 +180,14 @@ function buildDialog(Dialog, UnitType, defaults) {
 
     const shapeIndex = Math.max(0, SHAPE_KEYS.indexOf(defaults.shape));
     dlg.shapeBox = grp.addComboBox('Dot shape', SHAPE_LABELS, shapeIndex);
-    dlg.frequencyEditor = grp.addUnitValueEditor('Frequency (lines per inch)', UnitType.Number, UnitType.Number, defaults.frequency, 1, 300).setShowPopupSlider(true);
+    dlg.frequencyEditor = grp.addUnitValueEditor('Frequency (lines per inch)', UnitType.Number, UnitType.Number, defaults.frequency, 1, 300).setShowPopupSlider(true).setPrecision(0);
     // An explicit min/max is required for the popup slider to have any travel at all - reading
     // DialogGroup.addUnitValueEditor in /dialog.js shows that omitting them (as this field
     // originally did) defaults both to `defaults.angleDeg` itself, a zero-width range the slider
     // widget is already sized from before the separate "no min/no max" flag is applied. This is
     // why the slider couldn't be dragged at all (confirmed from the SDK's own source, not run
     // live) - frequencyEditor above was never affected, since it already had a real min/max.
-    dlg.angleEditor = grp.addUnitValueEditor('Angle (degrees)', UnitType.Degree, UnitType.Degree, defaults.angleDeg, -360, 360).setShowPopupSlider(true);
+    dlg.angleEditor = grp.addUnitValueEditor('Angle (degrees)', UnitType.Degree, UnitType.Degree, defaults.angleDeg, -360, 360).setShowPopupSlider(true).setPrecision(1);
     const modeIndex = Math.max(0, MODE_KEYS.indexOf(defaults.mode));
     dlg.modeBox = grp.addComboBox('Mode', MODE_LABELS, modeIndex);
     dlg.colorPicker = grp.addColourPicker('Dot colour (Mono mode only, ignored if "from art" is on)', defaults.color);

@@ -117,6 +117,10 @@ that could come undone.
 
 ## Changelog
 
+1.2.4 - From/To and the random seed now show one fewer decimal place
+(`setPrecision`) - a cleaner "12.5" instead of "12.527182..." without
+losing the fraction where one's actually useful; the seed is a whole
+number, so it shows no decimals at all.
 1.2.3 - Found and fixed the actual reason From/To's sliders couldn't be
 dragged at all: they had no explicit min/max, which (per /dialog.js's
 own source) gives the popup slider a zero-width range to work with

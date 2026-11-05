@@ -87,6 +87,8 @@ with its own values, since there's no swatch name to show.
 
 ## Changelog
 
+1.2.1 - Columns shows a whole number and the pt/position fields show
+one decimal place (`setPrecision`) instead of several.
 1.2.0 - The dialog now live-previews the legend on the canvas as you
 change any setting, instead of only drawing it after clicking OK.
 1.1.0 - Replaced the CONFIG-only workflow with a settings dialog (opens

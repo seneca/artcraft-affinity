@@ -70,7 +70,7 @@ Description:    Approximate port of VectorCraft's Type Tools > Text Tweaker. Giv
                  actually tested. Test the dialog for real before relying on it.
 
 Author:         Les Pruszynski (Middledot)
-Version:        1.2.3
+Version:        1.2.4
 Created:        05/11/2026
 Last updated:   05/11/2026
 Compatibility:  Affinity by Canva 3.3
@@ -204,11 +204,11 @@ function buildDialog(Dialog, UnitType, defaults) {
     // is deliberately kept well short of a real "unbounded" range, the same tradeoff
     // arrange-in-grid.js's GAP_MIN_PT/GAP_MAX_PT documents for the same reason (a huge range
     // makes the slider too coarse to be useful) - type a value directly for anything outside it.
-    dlg.fromEditor = grp.addUnitValueEditor('From', UnitType.Number, UnitType.Number, defaults.from, -FROM_TO_BOUND, FROM_TO_BOUND).setShowPopupSlider(true);
-    dlg.toEditor = grp.addUnitValueEditor('To', UnitType.Number, UnitType.Number, defaults.to, -FROM_TO_BOUND, FROM_TO_BOUND).setShowPopupSlider(true);
+    dlg.fromEditor = grp.addUnitValueEditor('From', UnitType.Number, UnitType.Number, defaults.from, -FROM_TO_BOUND, FROM_TO_BOUND).setShowPopupSlider(true).setPrecision(1);
+    dlg.toEditor = grp.addUnitValueEditor('To', UnitType.Number, UnitType.Number, defaults.to, -FROM_TO_BOUND, FROM_TO_BOUND).setShowPopupSlider(true).setPrecision(1);
     const shapeIndex = Math.max(0, SHAPE_KEYS.indexOf(defaults.shape));
     dlg.shapeBox = grp.addComboBox('Shape', SHAPE_LABELS, shapeIndex);
-    dlg.seedEditor = grp.addUnitValueEditor('Random seed (Shape = Random only)', UnitType.Number, UnitType.Number, defaults.seed);
+    dlg.seedEditor = grp.addUnitValueEditor('Random seed (Shape = Random only)', UnitType.Number, UnitType.Number, defaults.seed).setPrecision(0);
     dlg.skipSpacesBox = grp.addCheckBox('Skip spaces and line breaks', defaults.skipSpaces);
 
     return dlg;

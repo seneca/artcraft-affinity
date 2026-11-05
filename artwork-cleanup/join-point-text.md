@@ -107,6 +107,8 @@ no per-glyph position API in the Affinity SDK:
 
 ## Changelog
 
+1.2.3 - The tolerance field shows one decimal place (`setPrecision(1)`)
+instead of several.
 1.2.2 - Restored the tolerance field's popup slider (briefly removed in
 1.2.1) - the real cause of the live preview appearing not to work
 turned out to be a bug in vector-halftone.js's dialog, not a general

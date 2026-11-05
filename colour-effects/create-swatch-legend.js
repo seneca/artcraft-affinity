@@ -66,7 +66,7 @@ Description:    Adapted port of VectorCraft's Colour Effects > Create Swatch Leg
                  exercised live - test it for real before relying on it.
 
 Author:         Les Pruszynski (Middledot)
-Version:        1.2.0
+Version:        1.2.1
 Created:        05/11/2026
 Last updated:   05/11/2026
 Compatibility:  Affinity by Canva 3.3
@@ -142,14 +142,14 @@ function buildDialog(Dialog, UnitType, defaults) {
     dlg.scopeBox = grp.addComboBox('Colours to show', SCOPE_LABELS, scopeIndex);
     dlg.fillBox = grp.addCheckBox('Include fill colours', defaults.fill);
     dlg.strokeBox = grp.addCheckBox('Include stroke colours', defaults.stroke);
-    dlg.columnsEditor = grp.addUnitValueEditor('Columns', UnitType.Number, UnitType.Number, defaults.columns, 1, 50);
-    dlg.chipSizeEditor = grp.addUnitValueEditor('Chip size (pt)', UnitType.Number, UnitType.Number, defaults.chipSize, 1, null);
-    dlg.gapEditor = grp.addUnitValueEditor('Gap (pt)', UnitType.Number, UnitType.Number, defaults.gap, 0, null);
+    dlg.columnsEditor = grp.addUnitValueEditor('Columns', UnitType.Number, UnitType.Number, defaults.columns, 1, 50).setPrecision(0);
+    dlg.chipSizeEditor = grp.addUnitValueEditor('Chip size (pt)', UnitType.Number, UnitType.Number, defaults.chipSize, 1, null).setPrecision(1);
+    dlg.gapEditor = grp.addUnitValueEditor('Gap (pt)', UnitType.Number, UnitType.Number, defaults.gap, 0, null).setPrecision(1);
     dlg.showValuesBox = grp.addCheckBox('Label each chip with its colour values', defaults.showValues);
-    dlg.labelSizeEditor = grp.addUnitValueEditor('Label size (pt)', UnitType.Number, UnitType.Number, defaults.labelSize, 1, null);
+    dlg.labelSizeEditor = grp.addUnitValueEditor('Label size (pt)', UnitType.Number, UnitType.Number, defaults.labelSize, 1, null).setPrecision(1);
     dlg.autoPositionBox = grp.addCheckBox('Position automatically (inset from the corner)', defaults.autoPosition);
-    dlg.xEditor = grp.addUnitValueEditor('X (if not automatic)', UnitType.Number, UnitType.Number, defaults.x);
-    dlg.yEditor = grp.addUnitValueEditor('Y (if not automatic)', UnitType.Number, UnitType.Number, defaults.y);
+    dlg.xEditor = grp.addUnitValueEditor('X (if not automatic)', UnitType.Number, UnitType.Number, defaults.x).setPrecision(1);
+    dlg.yEditor = grp.addUnitValueEditor('Y (if not automatic)', UnitType.Number, UnitType.Number, defaults.y).setPrecision(1);
 
     return dlg;
 }

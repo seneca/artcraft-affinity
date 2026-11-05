@@ -80,6 +80,8 @@ using instead?"), just without needing named swatches to ask it.
 
 ## Changelog
 
+1.2.1 - Matches to report shows a whole number (`setPrecision(0)`)
+instead of several decimal places.
 1.2.0 - The dialog now shows a running summary (colours found, matched
 against how many) that updates as you change any setting.
 1.1.0 - Replaced the CONFIG-only workflow with a settings dialog (opens
