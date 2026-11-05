@@ -82,6 +82,12 @@ that could come undone.
 - **From/To are clamped to -1000..1000.** Needed so the dialog's popup
   slider has a real range to work with - type a value directly if you
   need something outside it (the field will clamp it back in).
+- **`"size"` and `"leading"` additionally floor at 0.001 and 0, even
+  within -1000..1000** - confirmed directly, live: Affinity's own
+  `GlyphAtts.height`/`absoluteLeading` throw an error below those
+  (a font size or line height of zero or less isn't meaningful anyway).
+  `"baselineShift"` and `"tracking"` have no such floor and ramp through
+  negative values normally, same as always.
 - **`"rotation"` isn't included.** Confirmed directly: Affinity's own
   character-styling model (`GlyphAtts`) has no per-character rotation
   attribute at all - only a shear/skew property, which slants a letter
@@ -117,6 +123,13 @@ that could come undone.
 
 ## Changelog
 
+1.2.5 - Fixed a real crash: dragging From/To through zero or negative
+while "size" or "leading" was selected threw `INVALID_ARGS` from
+Affinity's own `GlyphAtts` (confirmed directly, live, that `height`
+must be strictly positive and `absoluteLeading` must be >= 0).
+`"size"`/`"leading"` now floor their own value instead of writing
+whatever the shared From/To field holds - `"baselineShift"`/
+`"tracking"` are untouched and still ramp through negative values.
 1.2.4 - From/To and the random seed now show one fewer decimal place
 (`setPrecision`) - a cleaner "12.5" instead of "12.527182..." without
 losing the fraction where one's actually useful; the seed is a whole

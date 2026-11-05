@@ -70,7 +70,7 @@ Description:    Approximate port of VectorCraft's Type Tools > Text Tweaker. Giv
                  actually tested. Test the dialog for real before relying on it.
 
 Author:         Les Pruszynski (Middledot)
-Version:        1.2.4
+Version:        1.2.5
 Created:        05/11/2026
 Last updated:   05/11/2026
 Compatibility:  Affinity by Canva 3.3
@@ -124,13 +124,24 @@ const { StoryDelta } = require('/storydelta.js');
 
 // How to write one character's value of each VectorCraft attribute into its own GlyphAtts -
 // confirmed live against a real text object (see the file header for each mapping's details).
+// `height` and `absoluteLeading` throw INVALID_ARGS below their own minimum - confirmed directly,
+// live, by trying every value from -1000 to 100000 on a real GlyphAtts clone: `height` must be
+// strictly positive (0 itself fails; 0.001 is the smallest tested value that didn't), and
+// `absoluteLeading` must be >= 0. `offsetY`, `scaleX`, `scaleY` and `characterSpacing` accept any
+// value tested, including negative - which baselineShift and tracking both genuinely need (a
+// negative baseline shift moves a character up; negative tracking tightens it). Since the From/To
+// dialog fields are shared across all six attributes and can't have a different range per
+// attribute (the SDK exposes no way to change a UnitValueEditor's min/max after it's created),
+// each attribute clamps its own value to its own valid floor here instead of relying on the
+// dialog's shared range to keep it safe - narrowing that shared range to stay positive would have
+// broken baselineShift/tracking's negative ramps for everyone.
 const ATTRIBUTES = {
-    size: value => atts => { atts.height = value; },
+    size: value => atts => { atts.height = Math.max(0.001, value); },
     baselineShift: value => atts => { atts.offsetY = value; },
     hScale: value => atts => { atts.scaleX = value / 100; },
     vScale: value => atts => { atts.scaleY = value / 100; },
     tracking: value => atts => { atts.characterSpacing = value / 1000; },
-    leading: value => atts => { atts.absoluteLeading = value; },
+    leading: value => atts => { atts.absoluteLeading = Math.max(0, value); },
 };
 const ATTRIBUTE_KEYS = Object.keys(ATTRIBUTES);
 const ATTRIBUTE_LABELS = [
