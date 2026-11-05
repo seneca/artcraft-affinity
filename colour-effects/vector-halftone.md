@@ -1,0 +1,91 @@
+# vector-halftone
+
+Turns the one selected object into real vector halftone dots sized by its
+own tone, as one undo step.
+
+## Installation
+
+1. Open the Script Editor panel (**Window > Scripting > Script Editor**).
+2. Paste the contents of `vector-halftone.js` into the editor and press
+   **Run** - or, to keep it around, click **Save As...** to save it to the
+   Script Library (**Window > Scripting > Script Library**), then click it
+   there to run it any time.
+
+## Purpose
+
+An **approximate** port of VectorCraft's Colour Effects > Vector Halftone.
+Unlike Affinity's own Halftone (a raster live filter), this draws genuine
+vector geometry - real dot, square, diamond or line shapes you can scale,
+recolour or edit like any other path - sized by how dark (or light) the art
+is in each cell of a grid turned by your chosen screen angle.
+
+## How it works
+
+1. Requires exactly one object selected - a group counts as one, so group
+   several objects together first if you need to.
+2. Works out the cell size from `CONFIG.FREQUENCY` (lines per inch) and
+   renders the object to a real bitmap over its own bounds, inflated by one
+   cell - at roughly 4 pixels per cell, capped so it never allocates an
+   enormous image.
+3. For `CONFIG.MODE` `"mono"`: one screen, reading each cell's lightness
+   (so a dark area gets a big dot). For `"cmyk"`: four screens, one per
+   process ink at the classic offset angles, reading the art's own
+   **colour-managed** ink percentages, not a naive RGB guess.
+4. Each cell's tone sizes its own dot - a circle's radius, say, grows with
+   the square root of the tone, so its *area* follows the tone linearly.
+5. Every dot of one screen becomes one real multi-shape path object, filled
+   with that screen's ink (or, with `CONFIG.FROM_ART`, each dot takes the
+   art's own colour under it instead).
+6. The dots replace the original object (or sit alongside it, with
+   `CONFIG.KEEP_ORIGINAL` on) as one undo step, and are selected when it's
+   done.
+
+## Features
+
+- **Real vector output** — dots are actual editable paths, not a raster
+  effect
+- **No dialog** — set `CONFIG` once, then just run it
+- **Genuine colour-managed CMYK separation** in `"cmyk"` mode, not a naive
+  conversion
+- **Five dot shapes** — circle, ellipse, square, diamond, line
+- **`CONFIG.FROM_ART`** — each dot in the art's own colour underneath it
+- **Single undo step**
+
+## Usage tips
+
+- `CONFIG.FREQUENCY` is lines per inch, the same units a halftone screen is
+  always described in - lower numbers mean bigger, coarser dots.
+- A frequency that's too fine for a large object is refused outright
+  ("Too many dots for this size") rather than left to grind - lower it, or
+  work on a smaller selection.
+- `CONFIG.ANGLE` is the mono screen's angle, or the black screen's in
+  `"cmyk"` mode - cyan, magenta and yellow sit at their own classic offsets
+  from it automatically.
+- Set `CONFIG.KEEP_ORIGINAL` to `true` the first time you try a new setting
+  on something, so you can compare the dots against the original before
+  deciding to replace it.
+
+## Known limitations
+
+- **Dots aren't clipped to the art's own outline** - VectorCraft's own tool
+  can clip dots exactly to a non-rectangular shape's silhouette; this
+  always covers the object's full rectangular bounds instead, so a dot
+  near a shape's edge may extend slightly past it. Affinity's scripting SDK
+  does expose boolean path operations that could add this later.
+- **`"cmyk"` mode's four screens aren't given a Multiply blend mode** -
+  VectorCraft's own tool overlays them that way so the inks visually
+  combine; here they're added as ordinary separate layers (all selected
+  when the script finishes, so setting Multiply yourself is one blend-mode
+  change away if you want the classic look).
+- **The four `"cmyk"` layers aren't grouped** - the same reason
+  `create-swatch-legend.js`'s chips aren't: grouping newly created nodes
+  needs a second, separate command once they exist. They're all selected
+  when the script finishes.
+- **Images inside a group are sampled as rendered**, same as everything
+  else in the selection - there's no separate "image couldn't be decoded"
+  warning the way VectorCraft's own tool gives; a render that comes out
+  blank there would still just sample as blank here.
+
+## Changelog
+
+1.0.0 - Initial version.

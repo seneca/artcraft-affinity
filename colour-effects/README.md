@@ -26,6 +26,7 @@ external dependencies. For any script in this folder:
 | [`print-ink-fixes.js`](print-ink-fixes.md) | Scales down over-ink CMYK colours, and sets white/black overprint, across the selection or the whole CMYK document. |
 | [`find-nearest-swatch.js`](find-nearest-swatch.md) | Reports the colours already used elsewhere that are closest to each colour in your selection. Adapted - see its guide. |
 | [`create-swatch-legend.js`](create-swatch-legend.md) | Draws a grid of labelled chips, one per distinct colour used in the selection or the document. Adapted - see its guide. |
+| [`vector-halftone.js`](vector-halftone.md) | Turns the selected object into real vector halftone dots sized by its own tone, mono or CMYK. Approximate - see its guide. |
 
 See each script's own `.md` guide (linked above) for its full Purpose, How
 it works, Features, Usage tips, Known limitations, and Changelog.
