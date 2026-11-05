@@ -10,8 +10,10 @@ distinct colour in your **selection** - a report only; nothing changes.
    **Run** - or, to keep it around, click **Save As...** to save it to the
    Script Library (**Window > Scripting > Script Library**), then click it
    there to run it any time.
-3. A dialog opens for the settings below - change what you want and click
-   **OK**, or **Cancel** to back out without changing anything.
+3. A dialog opens for the settings below, with a running summary that
+   updates live as you change anything (there's nothing on the canvas to
+   preview, since this script never changes the document) - click **OK**
+   to see the full report, or **Cancel** to back out.
 
 ## Purpose
 
@@ -41,8 +43,9 @@ using instead?"), just without needing named swatches to ask it.
 
 ## Features
 
-- **A settings dialog** — select your objects, run it, and a dialog opens
-  pre-filled with `CONFIG`'s values
+- **A settings dialog with a live summary** — select your objects, run
+  it, and a dialog opens pre-filled with `CONFIG`'s values, showing a
+  running count of colours and matches as you change anything
 - **Checks fills, strokes and character-level text colour**, the same
   reach `print-ink-fixes.js` has
 - **ΔE under ~1 is essentially imperceptible, ~2-3 is a close match** - a
@@ -77,6 +80,8 @@ using instead?"), just without needing named swatches to ask it.
 
 ## Changelog
 
+1.2.0 - The dialog now shows a running summary (colours found, matched
+against how many) that updates as you change any setting.
 1.1.0 - Replaced the CONFIG-only workflow with a settings dialog (opens
 pre-filled from CONFIG's values); CONFIG now only sets the dialog's
 defaults.

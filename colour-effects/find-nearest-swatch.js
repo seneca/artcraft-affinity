@@ -51,14 +51,17 @@ Description:    Adapted port of VectorCraft's Colour Effects > Find Nearest Swat
 
                  Settings come from a dialog (Affinity's own Dialog API, /dialog.js) rather than a
                  CONFIG object you edit by hand - CONFIG below only supplies the values the dialog
-                 opens with. Note for future maintenance: dialogs can't be driven by this project's
-                 own MCP test tool (it only runs in the native Scripts panel), so the dialog's
-                 wiring was checked carefully against /dialog.js and ts/ui.d.ts but not exercised
-                 live the way every other part of this script was - test it for real before
+                 opens with. This script never changes the document (it only reports), so there's
+                 nothing to live-preview in the usual sense; instead, the dialog shows a running
+                 summary that updates as you change any setting, the same idea as
+                 rejoin-path-pieces.js's live match-count readout. Note for future maintenance: the
+                 dialog UI itself can't be driven by this project's own MCP test tool (it only runs
+                 in the native Scripts panel), so its controls and wiring were checked carefully
+                 against /dialog.js and ts/ui.d.ts but not exercised live - test it for real before
                  relying on it.
 
 Author:         Les Pruszynski (Middledot)
-Version:        1.1.0
+Version:        1.2.0
 Created:        05/11/2026
 Last updated:   05/11/2026
 Compatibility:  Affinity by Canva 3.3
@@ -99,32 +102,35 @@ const { Document } = require('/document.js');
 const SCOPE_KEYS = ['document', 'selection'];
 const SCOPE_LABELS = ['Whole document', 'Selection only'];
 
-// Shows the settings dialog pre-filled from `defaults`. Returns the chosen settings, or null if
-// the dialog was cancelled.
-//
-// Modules that clear the live selection when require()'d (/dialog among them) are loaded lazily,
-// after the selection is captured - see modern-js.md 2.1 in the affinity-scripts-toolkit.
-function showDialog(defaults) {
-    const { Dialog, DialogResult } = require('/dialog.js');
-    const { UnitType } = require('/units.js');
-
-    const dialog = Dialog.create('Find Nearest Swatch');
-    const col = dialog.addColumn();
+// Builds the settings dialog pre-filled from `defaults`, not yet run. `Dialog`/`UnitType` are
+// passed in rather than required at module scope, so the live selection (captured in main() before
+// this is called) can't be cleared by loading '/dialog.js' too early - see modern-js.md 2.1 in the
+// affinity-scripts-toolkit.
+function buildDialog(Dialog, UnitType, defaults) {
+    const dlg = Dialog.create('Find Nearest Swatch');
+    const col = dlg.addColumn();
     const grp = col.addGroup('Settings');
 
     const scopeIndex = Math.max(0, SCOPE_KEYS.indexOf(defaults.paletteScope));
-    const scopeBox = grp.addComboBox('Match against', SCOPE_LABELS, scopeIndex);
-    const countEditor = grp.addUnitValueEditor('Matches to report', UnitType.Number, UnitType.Number, defaults.count, 1, 50);
-    const fillBox = grp.addCheckBox('Include fill colours', defaults.fill);
-    const strokeBox = grp.addCheckBox('Include stroke colours', defaults.stroke);
+    dlg.scopeBox = grp.addComboBox('Match against', SCOPE_LABELS, scopeIndex);
+    dlg.countEditor = grp.addUnitValueEditor('Matches to report', UnitType.Number, UnitType.Number, defaults.count, 1, 50);
+    dlg.fillBox = grp.addCheckBox('Include fill colours', defaults.fill);
+    dlg.strokeBox = grp.addCheckBox('Include stroke colours', defaults.stroke);
+    // Live-updated from main() with a running summary - this script never changes the document
+    // (it only reports), so there's nothing to preview geometrically; this is the closest
+    // equivalent, the same idea as rejoin-path-pieces.js's live match-count readout.
+    dlg.status = grp.addStaticText(' ', ' ').setIsFullWidth(true);
 
-    if (dialog.runModal() !== DialogResult.Ok) return null;
+    return dlg;
+}
 
+// The dialog's current control values, as a plain cfg object.
+function readOptions(dlg) {
     return {
-        paletteScope: SCOPE_KEYS[scopeBox.selectedIndex],
-        count: Math.round(countEditor.value),
-        fill: fillBox.value,
-        stroke: strokeBox.value,
+        paletteScope: SCOPE_KEYS[dlg.scopeBox.selectedIndex],
+        count: Math.round(dlg.countEditor.value),
+        fill: dlg.fillBox.value,
+        stroke: dlg.strokeBox.value,
     };
 }
 
@@ -278,40 +284,22 @@ function describeColour(colour) {
     return hex;
 }
 
-// ============================================================
-// RUN
-// ============================================================
-
-function main() {
-    const doc = Document.current;
-    if (!doc) { alert('This script requires an open document'); return; }
-
-    const selected = doc.selection.nodes.toArray();
-    if (selected.length === 0) {
-        alert('Select one or more objects first - their own colours are what gets looked up.');
-        return;
-    }
-
-    const cfg = showDialog({
-        paletteScope: SCOPE_KEYS.includes(CONFIG.PALETTE_SCOPE) ? CONFIG.PALETTE_SCOPE : SCOPE_KEYS[0],
-        count: Math.max(1, Math.min(50, Math.round(Number(CONFIG.COUNT)) || 5)),
-        fill: CONFIG.FILL !== false,
-        stroke: CONFIG.STROKE !== false,
-    });
-    if (!cfg) return;
-
+// Builds the full report for `cfg` over `selected`/`doc`. Returns { report, summary, reason } -
+// report/summary are '' if nothing to report; `reason` is 'noLookupColours' (the selection has
+// nothing to look up), 'noPaletteColours' (the chosen scope finds nothing to match against) or
+// null. Cheap enough (no rendering, just CIEDE2000 over however many distinct colours exist) to
+// call on every dialog change.
+function buildReport(doc, selected, cfg) {
     const lookupColours = collectColours(selected, cfg);
     if (lookupColours.length === 0) {
-        alert('The selection has no solid or gradient colours to look up.');
-        return;
+        return { report: '', summary: '', reason: 'noLookupColours' };
     }
 
     const paletteRoots = cfg.paletteScope === 'selection' ? selected : doc.spreads.toArray();
     const paletteColours = collectColours(paletteRoots, cfg)
         .map(colour => ({ colour, lab: standardLab(colour) }));
     if (paletteColours.length === 0) {
-        alert('Nothing to match against - that scope finds no colours at all.');
-        return;
+        return { report: '', summary: '', reason: 'noPaletteColours' };
     }
 
     const lines = [];
@@ -327,11 +315,61 @@ function main() {
         });
     });
 
-    const report = lines.join('\n');
-    console.log(report);
-    alert(lookupColours.length + ' colour' + (lookupColours.length === 1 ? '' : 's') +
+    const summary = lookupColours.length + ' colour' + (lookupColours.length === 1 ? '' : 's') +
         ' in the selection, matched against ' + paletteColours.length + ' found in the ' +
-        cfg.paletteScope + ':\n\n' + report);
+        cfg.paletteScope + '.';
+    return { report: lines.join('\n'), summary, reason: null };
+}
+
+// ============================================================
+// RUN
+// ============================================================
+
+function main() {
+    const doc = Document.current;
+    if (!doc) { alert('This script requires an open document'); return; }
+
+    const selected = doc.selection.nodes.toArray();
+    if (selected.length === 0) {
+        alert('Select one or more objects first - their own colours are what gets looked up.');
+        return;
+    }
+
+    const { Dialog, DialogResult } = require('/dialog.js');
+    const { UnitType } = require('/units.js');
+
+    const dlg = buildDialog(Dialog, UnitType, {
+        paletteScope: SCOPE_KEYS.includes(CONFIG.PALETTE_SCOPE) ? CONFIG.PALETTE_SCOPE : SCOPE_KEYS[0],
+        count: Math.max(1, Math.min(50, Math.round(Number(CONFIG.COUNT)) || 5)),
+        fill: CONFIG.FILL !== false,
+        stroke: CONFIG.STROKE !== false,
+    });
+
+    let last = { report: '', summary: '', reason: null };
+    const update = () => {
+        last = buildReport(doc, selected, readOptions(dlg));
+        dlg.status.text = last.reason === 'noLookupColours'
+            ? 'The selection has no solid or gradient colours to look up.'
+            : last.reason === 'noPaletteColours'
+                ? 'Nothing to match against - that scope finds no colours at all.'
+                : last.summary;
+        return last;
+    };
+
+    dlg.onControlValueChangedHandler = update;
+    update();
+
+    if (dlg.runModal() === DialogResult.Ok) {
+        const result = update();
+        if (result.reason === 'noLookupColours') {
+            alert('The selection has no solid or gradient colours to look up.');
+        } else if (result.reason === 'noPaletteColours') {
+            alert('Nothing to match against - that scope finds no colours at all.');
+        } else {
+            console.log(result.report);
+            alert(result.summary + '\n\n' + result.report);
+        }
+    }
 }
 
 try {

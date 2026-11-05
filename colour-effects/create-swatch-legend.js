@@ -54,14 +54,19 @@ Description:    Adapted port of VectorCraft's Colour Effects > Create Swatch Leg
 
                  Settings come from a dialog (Affinity's own Dialog API, /dialog.js) rather than a
                  CONFIG object you edit by hand - CONFIG below only supplies the values the dialog
-                 opens with. Note for future maintenance: dialogs can't be driven by this project's
-                 own MCP test tool (it only runs in the native Scripts panel), so the dialog's
-                 wiring was checked carefully against /dialog.js and ts/ui.d.ts but not exercised
-                 live the way every other part of this script was - test it for real before
-                 relying on it.
+                 opens with. The dialog live-previews the actual legend as you change any setting
+                 (doc.executeCommand(cmd, true)/doc.clearPreviews(), the same mechanism
+                 arrange-in-grid.js uses) - confirmed directly via this project's own test tool
+                 that a plain add-nodes command (no delete/reorder/duplicate) reverts cleanly from
+                 a preview, and that a second preview always replaces the first rather than
+                 stacking on it, so rebuilding the whole legend from scratch on every change is
+                 safe. Note for future maintenance: the dialog UI itself still can't be driven by
+                 that same test tool (it only runs in the native Scripts panel), so its controls
+                 and wiring were checked carefully against /dialog.js and ts/ui.d.ts but not
+                 exercised live - test it for real before relying on it.
 
 Author:         Les Pruszynski (Middledot)
-Version:        1.1.0
+Version:        1.2.0
 Created:        05/11/2026
 Last updated:   05/11/2026
 Compatibility:  Affinity by Canva 3.3
@@ -124,45 +129,44 @@ const { StoryBuilder } = require('/storybuilder.js');
 const SCOPE_KEYS = ['document', 'selection'];
 const SCOPE_LABELS = ['Whole document', 'Selection only'];
 
-// Shows the settings dialog pre-filled from `defaults`. Returns the chosen settings, or null if
-// the dialog was cancelled.
-//
-// Modules that clear the live selection when require()'d (/dialog among them) are loaded lazily,
-// after the selection is captured - see modern-js.md 2.1 in the affinity-scripts-toolkit.
-function showDialog(defaults) {
-    const { Dialog, DialogResult } = require('/dialog.js');
-    const { UnitType } = require('/units.js');
-
-    const dialog = Dialog.create('Create Swatch Legend');
-    const col = dialog.addColumn();
+// Builds the settings dialog pre-filled from `defaults`, not yet run. `Dialog`/`UnitType` are
+// passed in rather than required at module scope, so the live selection (captured in main() before
+// this is called) can't be cleared by loading '/dialog.js' too early - see modern-js.md 2.1 in the
+// affinity-scripts-toolkit.
+function buildDialog(Dialog, UnitType, defaults) {
+    const dlg = Dialog.create('Create Swatch Legend');
+    const col = dlg.addColumn();
     const grp = col.addGroup('Settings');
 
     const scopeIndex = Math.max(0, SCOPE_KEYS.indexOf(defaults.scope));
-    const scopeBox = grp.addComboBox('Colours to show', SCOPE_LABELS, scopeIndex);
-    const fillBox = grp.addCheckBox('Include fill colours', defaults.fill);
-    const strokeBox = grp.addCheckBox('Include stroke colours', defaults.stroke);
-    const columnsEditor = grp.addUnitValueEditor('Columns', UnitType.Number, UnitType.Number, defaults.columns, 1, 50);
-    const chipSizeEditor = grp.addUnitValueEditor('Chip size (pt)', UnitType.Number, UnitType.Number, defaults.chipSize, 1, null);
-    const gapEditor = grp.addUnitValueEditor('Gap (pt)', UnitType.Number, UnitType.Number, defaults.gap, 0, null);
-    const showValuesBox = grp.addCheckBox('Label each chip with its colour values', defaults.showValues);
-    const labelSizeEditor = grp.addUnitValueEditor('Label size (pt)', UnitType.Number, UnitType.Number, defaults.labelSize, 1, null);
-    const autoPositionBox = grp.addCheckBox('Position automatically (inset from the corner)', defaults.autoPosition);
-    const xEditor = grp.addUnitValueEditor('X (if not automatic)', UnitType.Number, UnitType.Number, defaults.x);
-    const yEditor = grp.addUnitValueEditor('Y (if not automatic)', UnitType.Number, UnitType.Number, defaults.y);
+    dlg.scopeBox = grp.addComboBox('Colours to show', SCOPE_LABELS, scopeIndex);
+    dlg.fillBox = grp.addCheckBox('Include fill colours', defaults.fill);
+    dlg.strokeBox = grp.addCheckBox('Include stroke colours', defaults.stroke);
+    dlg.columnsEditor = grp.addUnitValueEditor('Columns', UnitType.Number, UnitType.Number, defaults.columns, 1, 50);
+    dlg.chipSizeEditor = grp.addUnitValueEditor('Chip size (pt)', UnitType.Number, UnitType.Number, defaults.chipSize, 1, null);
+    dlg.gapEditor = grp.addUnitValueEditor('Gap (pt)', UnitType.Number, UnitType.Number, defaults.gap, 0, null);
+    dlg.showValuesBox = grp.addCheckBox('Label each chip with its colour values', defaults.showValues);
+    dlg.labelSizeEditor = grp.addUnitValueEditor('Label size (pt)', UnitType.Number, UnitType.Number, defaults.labelSize, 1, null);
+    dlg.autoPositionBox = grp.addCheckBox('Position automatically (inset from the corner)', defaults.autoPosition);
+    dlg.xEditor = grp.addUnitValueEditor('X (if not automatic)', UnitType.Number, UnitType.Number, defaults.x);
+    dlg.yEditor = grp.addUnitValueEditor('Y (if not automatic)', UnitType.Number, UnitType.Number, defaults.y);
 
-    if (dialog.runModal() !== DialogResult.Ok) return null;
+    return dlg;
+}
 
+// The dialog's current control values, as a plain cfg object.
+function readOptions(dlg) {
     return {
-        scope: SCOPE_KEYS[scopeBox.selectedIndex],
-        fill: fillBox.value,
-        stroke: strokeBox.value,
-        columns: columnsEditor.value,
-        chipSize: chipSizeEditor.value,
-        gap: gapEditor.value,
-        showValues: showValuesBox.value,
-        labelSize: labelSizeEditor.value,
-        x: autoPositionBox.value ? null : xEditor.value,
-        y: autoPositionBox.value ? null : yEditor.value,
+        scope: SCOPE_KEYS[dlg.scopeBox.selectedIndex],
+        fill: dlg.fillBox.value,
+        stroke: dlg.strokeBox.value,
+        columns: dlg.columnsEditor.value,
+        chipSize: dlg.chipSizeEditor.value,
+        gap: dlg.gapEditor.value,
+        showValues: dlg.showValuesBox.value,
+        labelSize: dlg.labelSizeEditor.value,
+        x: dlg.autoPositionBox.value ? null : dlg.xEditor.value,
+        y: dlg.autoPositionBox.value ? null : dlg.yEditor.value,
     };
 }
 
@@ -279,41 +283,18 @@ function buildLabelDefinition(doc, text, x, y, textColour, labelSize) {
     return ArtTextNodeDefinition.createFromStoryBuilder({ x, y }, sb);
 }
 
-// ============================================================
-// RUN
-// ============================================================
-
-function main() {
-    const doc = Document.current;
-    if (!doc) { alert('This script requires an open document'); return; }
-
-    const selected = doc.selection.nodes.toArray();
-
-    const cfg = showDialog({
-        scope: SCOPE_KEYS.includes(CONFIG.SCOPE) ? CONFIG.SCOPE : SCOPE_KEYS[0],
-        fill: CONFIG.FILL !== false,
-        stroke: CONFIG.STROKE !== false,
-        columns: Math.max(1, Math.round(Number(CONFIG.COLUMNS)) || 4),
-        chipSize: isFinite(Number(CONFIG.CHIP_SIZE)) ? Number(CONFIG.CHIP_SIZE) : 72,
-        gap: isFinite(Number(CONFIG.GAP)) ? Number(CONFIG.GAP) : 12,
-        showValues: CONFIG.SHOW_VALUES !== false,
-        labelSize: isFinite(Number(CONFIG.LABEL_SIZE)) ? Number(CONFIG.LABEL_SIZE) : 9,
-        autoPosition: CONFIG.X == null && CONFIG.Y == null,
-        x: CONFIG.X != null ? Number(CONFIG.X) : 0,
-        y: CONFIG.Y != null ? Number(CONFIG.Y) : 0,
-    });
-    if (!cfg) return;
-
+// Builds the full add-nodes command for `cfg` over `selected`/`doc`, without executing it. Returns
+// { cmd, count, reason } - cmd is null if nothing would be created; `reason` is 'noSelection'
+// ("Selection only" with nothing selected), 'noColours' (nothing paintable was found) or null.
+// This is called on every live-preview tick, not just once on OK, so it never alerts itself.
+function buildLegendCommand(doc, selected, cfg) {
     if (cfg.scope === 'selection' && selected.length === 0) {
-        alert('Nothing is selected - select some objects first, or choose "Whole document" in the dialog.');
-        return;
+        return { cmd: null, count: 0, reason: 'noSelection' };
     }
-
     const roots = cfg.scope === 'selection' ? selected : doc.spreads.toArray();
     const colours = collectColours(roots, cfg).slice(0, MAX_CHIPS);
     if (colours.length === 0) {
-        alert('No solid or gradient colours were found.');
-        return;
+        return { cmd: null, count: 0, reason: 'noColours' };
     }
 
     const cols = Math.max(1, Math.round(cfg.columns));
@@ -337,13 +318,60 @@ function main() {
         }
     });
 
-    const cmd = builder.createCommand(false);
-    doc.executeCommand(cmd);
-    const newNodes = cmd.newNodes;
-    if (newNodes.length > 0) {
-        doc.selection = Selection.create(doc, newNodes);
+    return { cmd: builder.createCommand(false), count: colours.length, reason: null };
+}
+
+// ============================================================
+// RUN
+// ============================================================
+
+function main() {
+    const doc = Document.current;
+    if (!doc) { alert('This script requires an open document'); return; }
+
+    const selected = doc.selection.nodes.toArray();
+
+    const { Dialog, DialogResult } = require('/dialog.js');
+    const { UnitType } = require('/units.js');
+
+    const dlg = buildDialog(Dialog, UnitType, {
+        scope: SCOPE_KEYS.includes(CONFIG.SCOPE) ? CONFIG.SCOPE : SCOPE_KEYS[0],
+        fill: CONFIG.FILL !== false,
+        stroke: CONFIG.STROKE !== false,
+        columns: Math.max(1, Math.round(Number(CONFIG.COLUMNS)) || 4),
+        chipSize: isFinite(Number(CONFIG.CHIP_SIZE)) ? Number(CONFIG.CHIP_SIZE) : 72,
+        gap: isFinite(Number(CONFIG.GAP)) ? Number(CONFIG.GAP) : 12,
+        showValues: CONFIG.SHOW_VALUES !== false,
+        labelSize: isFinite(Number(CONFIG.LABEL_SIZE)) ? Number(CONFIG.LABEL_SIZE) : 9,
+        autoPosition: CONFIG.X == null && CONFIG.Y == null,
+        x: CONFIG.X != null ? Number(CONFIG.X) : 0,
+        y: CONFIG.Y != null ? Number(CONFIG.Y) : 0,
+    });
+
+    let last = { cmd: null, count: 0, reason: null };
+    const update = (preview) => {
+        last = buildLegendCommand(doc, selected, readOptions(dlg));
+        if (last.cmd) doc.executeCommand(last.cmd, preview);
+        else doc.clearPreviews();
+        return last;
+    };
+
+    dlg.onControlValueChangedHandler = () => update(true);
+    update(true);
+
+    if (dlg.runModal() === DialogResult.Ok) {
+        const result = update(false);
+        if (result.reason === 'noSelection') {
+            alert('Nothing is selected - select some objects first, or choose "Whole document" in the dialog.');
+        } else if (result.reason === 'noColours') {
+            alert('No solid or gradient colours were found.');
+        } else {
+            const newNodes = result.cmd.newNodes;
+            if (newNodes.length > 0) doc.selection = Selection.create(doc, newNodes);
+            alert('Created a legend of ' + result.count + ' colour' + (result.count === 1 ? '' : 's') + '.');
+        }
     }
-    alert('Created a legend of ' + colours.length + ' colour' + (colours.length === 1 ? '' : 's') + '.');
+    doc.clearPreviews();
 }
 
 try {

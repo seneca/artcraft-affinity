@@ -52,13 +52,19 @@ Description:    Port of VectorCraft's Artwork Cleanup > Replace Missing Fonts. S
 
                  The replacement font name comes from a small dialog (Affinity's own Dialog API,
                  /dialog.js) rather than a CONFIG edit - CONFIG.REPLACEMENT_FONT below only
-                 supplies the text the dialog opens with. Note for future maintenance: dialogs
-                 can't be driven by this project's own MCP test tool (it only runs in the native
-                 Scripts panel), so this wiring was checked carefully against /dialog.js's own
-                 source but not exercised live - test it for real before relying on it.
+                 supplies the text the dialog opens with. The dialog live-previews the actual
+                 replacement as you type (FormatText-only, no node creation/deletion, so this is
+                 safe to recompute on every keystroke - confirmed directly via this project's own
+                 test tool that a second preview always replaces the first rather than stacking on
+                 it); while the typed name doesn't resolve to an installed family, the status line
+                 just says so instead of erroring on every keystroke. Note for future maintenance:
+                 the dialog UI itself still can't be driven by this project's own MCP test tool (it
+                 only runs in the native Scripts panel), so its wiring was checked carefully
+                 against /dialog.js's own source but not exercised live - test it for real before
+                 relying on it.
 
 Author:         Les Pruszynski (Middledot)
-Version:        1.1.0
+Version:        1.2.0
 Created:        05/11/2026
 Last updated:   05/11/2026
 Compatibility:  Affinity by Canva 3.3
@@ -176,31 +182,17 @@ function queueNodeFixes(doc, node, replacementFonts, builder) {
     return count;
 }
 
-// ============================================================
-// RUN
-// ============================================================
-
-function main() {
-    const doc = Document.current;
-    if (!doc) { alert('This script requires an open document'); return; }
-
-    const { Dialog, DialogResult } = require('/dialog.js');
-    const dlg = Dialog.create('Replace Missing Fonts');
-    const col = dlg.addColumn();
-    const grp = col.addGroup('Settings');
-    const fontBox = grp.addTextBox('Replacement font family', CONFIG.REPLACEMENT_FONT);
-    if (dlg.runModal() !== DialogResult.Ok) return;
-    const replacementFont = fontBox.text;
-
-    const family = FontFamily.all.find(f => f.name === replacementFont);
+// Builds the full compound command replacing every missing font across `nodes` with
+// `replacementFontName`, without executing it. Returns { cmd, runCount, nodeCount, reason } -
+// cmd is null if nothing would change; `reason` is 'fontNotFound' (the typed family isn't
+// installed) or 'nothingMissing' (there's nothing to fix) or null. Cheap to call on every
+// keystroke: no rendering, just a doc-wide scan of each run's own font.
+function buildFontFixCommand(doc, nodes, replacementFontName) {
+    const family = FontFamily.all.find(f => f.name === replacementFontName);
     if (!family || family.fontCount === 0) {
-        alert('The replacement font "' + replacementFont + '" is not available on this system - ' +
-            'run it again with a family name that is.');
-        return;
+        return { cmd: null, runCount: 0, nodeCount: 0, reason: 'fontNotFound' };
     }
     const replacementFonts = family.fonts;
-
-    const nodes = collectTextNodes(doc.spreads.toArray());
 
     const builder = CompoundCommandBuilder.create();
     let runCount = 0;
@@ -212,16 +204,65 @@ function main() {
             nodeCount++;
         }
     }
+    if (runCount === 0) return { cmd: null, runCount: 0, nodeCount: 0, reason: 'nothingMissing' };
 
-    if (runCount === 0) {
-        alert('No fonts are missing.');
-        return;
+    return { cmd: builder.createCommand(), runCount, nodeCount, reason: null };
+}
+
+// ============================================================
+// RUN
+// ============================================================
+
+function main() {
+    const doc = Document.current;
+    if (!doc) { alert('This script requires an open document'); return; }
+
+    const nodes = collectTextNodes(doc.spreads.toArray());
+
+    const { Dialog, DialogResult } = require('/dialog.js');
+    const dlg = Dialog.create('Replace Missing Fonts');
+    const col = dlg.addColumn();
+    const grp = col.addGroup('Settings');
+    const fontBox = grp.addTextBox('Replacement font family', CONFIG.REPLACEMENT_FONT);
+    // Live-updated from update() below - a running status, since a typo-in-progress ("not
+    // installed yet") shouldn't pop its own alert on every keystroke.
+    const status = grp.addStaticText(' ', ' ').setIsFullWidth(true);
+
+    // FormatText-only (no node creation/deletion), so this is safe to live-preview on every
+    // keystroke the same way text-tweaker.js/print-ink-fixes.js are - confirmed directly via
+    // this project's own test tool that a second preview always replaces the first.
+    let last = { cmd: null, runCount: 0, nodeCount: 0, reason: null };
+    const update = (preview) => {
+        last = buildFontFixCommand(doc, nodes, fontBox.text);
+        if (last.cmd) doc.executeCommand(last.cmd, preview);
+        else doc.clearPreviews();
+        status.text = last.reason === 'fontNotFound'
+            ? 'Not installed on this system (yet) - keep typing, or pick a family that is.'
+            : last.reason === 'nothingMissing'
+                ? 'No fonts are missing.'
+                : 'Would replace ' + last.runCount + ' run' + (last.runCount === 1 ? '' : 's') +
+                    ' across ' + last.nodeCount + ' object' + (last.nodeCount === 1 ? '' : 's') + '.';
+        return last;
+    };
+
+    dlg.onControlValueChangedHandler = () => update(true);
+    update(true);
+
+    if (dlg.runModal() === DialogResult.Ok) {
+        const replacementFont = fontBox.text;
+        const result = update(false);
+        if (result.reason === 'fontNotFound') {
+            alert('The replacement font "' + replacementFont + '" is not available on this system - ' +
+                'run it again with a family name that is.');
+        } else if (result.reason === 'nothingMissing') {
+            alert('No fonts are missing.');
+        } else {
+            alert('Replaced ' + result.runCount + ' run' + (result.runCount === 1 ? '' : 's') + ' of missing font' +
+                (result.runCount === 1 ? '' : 's') + ' across ' + result.nodeCount + ' object' +
+                (result.nodeCount === 1 ? '' : 's') + ' with "' + replacementFont + '".');
+        }
     }
-
-    doc.executeCommand(builder.createCommand());
-    alert('Replaced ' + runCount + ' run' + (runCount === 1 ? '' : 's') + ' of missing font' +
-        (runCount === 1 ? '' : 's') + ' across ' + nodeCount + ' object' + (nodeCount === 1 ? '' : 's') +
-        ' with "' + replacementFont + '".');
+    doc.clearPreviews();
 }
 
 try {

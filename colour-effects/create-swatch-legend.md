@@ -10,8 +10,9 @@ painted somewhere in `CONFIG.SCOPE`, as one undo step.
    press **Run** - or, to keep it around, click **Save As...** to save it
    to the Script Library (**Window > Scripting > Script Library**), then
    click it there to run it any time.
-3. A dialog opens for the settings below - change what you want and click
-   **OK**, or **Cancel** to back out without changing anything.
+3. A dialog opens for the settings below, previewing the legend live on
+   the canvas as you change anything - click **OK** to keep it, or
+   **Cancel** to back out without changing anything.
 
 ## Purpose
 
@@ -40,9 +41,9 @@ with its own values, since there's no swatch name to show.
 
 ## Features
 
-- **A settings dialog** — opens pre-filled with `CONFIG`'s values, so you
-  can either edit `CONFIG` for new defaults or just change things in the
-  dialog each time
+- **A settings dialog with a live preview** — opens pre-filled with
+  `CONFIG`'s values, and draws the actual legend on the canvas as you
+  change anything, before you ever click OK
 - **Checks fills, strokes and character-level text colour**, the same
   reach `print-ink-fixes.js` has
 - **Chips are already the right colour the moment they're created** - no
@@ -76,14 +77,18 @@ with its own values, since there's no swatch name to show.
   own tool leaving them out of its own legend.
 - **Gradient meshes aren't looked at** - only a solid colour or a plain
   gradient's stops.
-- **The dialog couldn't be tested the way this project's other scripts
-  are** - Affinity's scripting SDK's dialogs only run in the native
-  Scripts panel, not through this project's own MCP-based test tool, so
-  this one was checked carefully against the SDK's own source rather than
-  run live before shipping. Flag it if it misbehaves.
+- **The dialog UI itself couldn't be tested the way this project's other
+  scripts are** - Affinity's scripting SDK's dialogs only run in the
+  native Scripts panel, not through this project's own MCP-based test
+  tool. The live-preview mechanics underneath it were confirmed directly
+  (that doesn't need a dialog to test), but the dialog's own controls and
+  wiring were only checked against the SDK's source, not run live. Flag
+  it if it misbehaves.
 
 ## Changelog
 
+1.2.0 - The dialog now live-previews the legend on the canvas as you
+change any setting, instead of only drawing it after clicking OK.
 1.1.0 - Replaced the CONFIG-only workflow with a settings dialog (opens
 pre-filled from CONFIG's values); CONFIG now only sets the dialog's
 defaults.

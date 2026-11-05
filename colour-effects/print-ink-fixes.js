@@ -62,14 +62,18 @@ Description:    Port of VectorCraft's Colour Effects > Print Ink Fixes. Prepares
 
                  Settings come from a dialog (Affinity's own Dialog API, /dialog.js) rather than a
                  CONFIG object you edit by hand - CONFIG below only supplies the values the dialog
-                 opens with. Note for future maintenance: dialogs can't be driven by this project's
-                 own MCP test tool (it only runs in the native Scripts panel), so the dialog's
-                 wiring was checked carefully against /dialog.js and ts/ui.d.ts but not exercised
-                 live the way every other part of this script was - test it for real before
-                 relying on it.
+                 opens with. The dialog live-previews every fix on the real artwork as you change
+                 any setting (doc.executeCommand(cmd, true)/doc.clearPreviews(), the same mechanism
+                 arrange-in-grid.js uses) - safe to recompute from scratch on every change since a
+                 second preview always replaces the first rather than stacking on it, confirmed
+                 directly via this project's own test tool. Note for future maintenance: the dialog
+                 UI itself still can't be driven by that same test tool (it only runs in the native
+                 Scripts panel), so its controls and wiring were checked carefully against
+                 /dialog.js and ts/ui.d.ts but not exercised live - test it for real before relying
+                 on it.
 
 Author:         Les Pruszynski (Middledot)
-Version:        1.1.0
+Version:        1.2.0
 Created:        05/11/2026
 Last updated:   05/11/2026
 Compatibility:  Affinity by Canva 3.3
@@ -130,40 +134,39 @@ const { StoryDelta } = require('/storydelta.js');
 const SCOPE_KEYS = ['auto', 'document', 'selection'];
 const SCOPE_LABELS = ['Automatic (selection if any, else whole document)', 'Whole document', 'Selection only'];
 
-// Shows the settings dialog pre-filled from `defaults`. Returns the chosen settings, or null if
-// the dialog was cancelled.
-//
-// Modules that clear the live selection when require()'d (/dialog among them) are loaded lazily,
-// after the selection is captured - see modern-js.md 2.1 in the affinity-scripts-toolkit.
-function showDialog(defaults) {
-    const { Dialog, DialogResult } = require('/dialog.js');
-    const { UnitType } = require('/units.js');
-
-    const dialog = Dialog.create('Print Ink Fixes');
-    const col = dialog.addColumn();
+// Builds the settings dialog pre-filled from `defaults`, not yet run. `Dialog`/`UnitType` are
+// passed in rather than required at module scope, so the live selection (captured in main() before
+// this is called) can't be cleared by loading '/dialog.js' too early - see modern-js.md 2.1 in the
+// affinity-scripts-toolkit.
+function buildDialog(Dialog, UnitType, defaults) {
+    const dlg = Dialog.create('Print Ink Fixes');
+    const col = dlg.addColumn();
     const grp = col.addGroup('Settings');
 
     const scopeIndex = Math.max(0, SCOPE_KEYS.indexOf(defaults.scope));
-    const scopeBox = grp.addComboBox('Scope', SCOPE_LABELS, scopeIndex);
-    const inkLimitEditor = grp.addUnitValueEditor('Ink limit, % (0 = off)', UnitType.Percentage, UnitType.Percentage, defaults.inkLimitPercent, 0, 400);
-    const excludePureBlackBox = grp.addCheckBox('Leave pure blacks/greys at full ink', defaults.excludePureBlack);
-    const removeWhiteOverprintBox = grp.addCheckBox('Turn off overprint on white', defaults.removeWhiteOverprint);
-    const overprintBlackEditor = grp.addUnitValueEditor('Turn on overprint at this black ink %, (0 = off)', UnitType.Percentage, UnitType.Percentage, defaults.overprintBlackPercent, 0, 100);
-    const textOnlyBox = grp.addCheckBox('Limit the overprint-black fix to text only', defaults.textOnly);
-    const fillBox = grp.addCheckBox('Fix fill colours', defaults.fill);
-    const strokeBox = grp.addCheckBox('Fix stroke colours', defaults.stroke);
+    dlg.scopeBox = grp.addComboBox('Scope', SCOPE_LABELS, scopeIndex);
+    dlg.inkLimitEditor = grp.addUnitValueEditor('Ink limit, % (0 = off)', UnitType.Percentage, UnitType.Percentage, defaults.inkLimitPercent, 0, 400).setShowPopupSlider(true);
+    dlg.excludePureBlackBox = grp.addCheckBox('Leave pure blacks/greys at full ink', defaults.excludePureBlack);
+    dlg.removeWhiteOverprintBox = grp.addCheckBox('Turn off overprint on white', defaults.removeWhiteOverprint);
+    dlg.overprintBlackEditor = grp.addUnitValueEditor('Turn on overprint at this black ink %, (0 = off)', UnitType.Percentage, UnitType.Percentage, defaults.overprintBlackPercent, 0, 100).setShowPopupSlider(true);
+    dlg.textOnlyBox = grp.addCheckBox('Limit the overprint-black fix to text only', defaults.textOnly);
+    dlg.fillBox = grp.addCheckBox('Fix fill colours', defaults.fill);
+    dlg.strokeBox = grp.addCheckBox('Fix stroke colours', defaults.stroke);
 
-    if (dialog.runModal() !== DialogResult.Ok) return null;
+    return dlg;
+}
 
+// The dialog's current control values, as a plain cfg object.
+function readOptions(dlg) {
     return {
-        scope: SCOPE_KEYS[scopeBox.selectedIndex],
-        inkLimit: inkLimitEditor.value / 100,
-        excludePureBlack: excludePureBlackBox.value,
-        removeWhiteOverprint: removeWhiteOverprintBox.value,
-        overprintBlack: overprintBlackEditor.value / 100,
-        textOnly: textOnlyBox.value,
-        fill: fillBox.value,
-        stroke: strokeBox.value,
+        scope: SCOPE_KEYS[dlg.scopeBox.selectedIndex],
+        inkLimit: dlg.inkLimitEditor.value / 100,
+        excludePureBlack: dlg.excludePureBlackBox.value,
+        removeWhiteOverprint: dlg.removeWhiteOverprintBox.value,
+        overprintBlack: dlg.overprintBlackEditor.value / 100,
+        textOnly: dlg.textOnlyBox.value,
+        fill: dlg.fillBox.value,
+        stroke: dlg.strokeBox.value,
     };
 }
 
@@ -370,17 +373,43 @@ function collectNodes(roots) {
 
 // The roots to search: the selection, or the whole document while nothing is selected - the same
 // default VectorCraft's own tool uses - unless CONFIG.SCOPE forces one or the other. `selected`
-// must be captured before showDialog() is called - see that function's own comment on why.
+// must be captured before buildDialog() is used - see that function's own comment on why. Returns
+// null (quietly - no alert here) for "Selection only" with nothing selected: this is called on
+// every live-preview tick, not just once on OK, so the caller decides when that's worth telling
+// the user about.
 function resolveRoots(doc, cfg, selected) {
     const scope = cfg.scope === 'auto' ? (selected.length > 0 ? 'selection' : 'document') : cfg.scope;
     if (scope === 'selection') {
-        if (selected.length === 0) {
-            alert('Nothing is selected - select some objects first, or choose "Whole document" in the dialog.');
-            return null;
-        }
-        return selected;
+        return selected.length > 0 ? selected : null;
     }
     return doc.spreads.toArray();
+}
+
+// Builds the full compound command for `cfg` over `selected`, without executing it. Returns
+// { cmd, fixedCount, nodeCount, reason } - cmd is null if nothing would change; `reason` is
+// 'nothingToDo' (everything left at 0/unchecked), 'noSelection' ("Selection only" with nothing
+// selected) or null (ran fine, fixedCount just happened to be 0). This is called on every
+// live-preview tick, not just once on OK, so it never alerts itself - the caller decides when
+// `reason` is worth telling the user about.
+function buildFixCommand(doc, selected, cfg) {
+    if (cfg.inkLimit <= 0 && cfg.overprintBlack <= 0 && !cfg.removeWhiteOverprint) {
+        return { cmd: null, fixedCount: 0, nodeCount: 0, reason: 'nothingToDo' };
+    }
+    const roots = resolveRoots(doc, cfg, selected);
+    if (!roots) return { cmd: null, fixedCount: 0, nodeCount: 0, reason: 'noSelection' };
+
+    const nodes = collectNodes(roots);
+    const builder = CompoundCommandBuilder.create();
+    let fixedCount = 0;
+    let nodeCount = 0;
+    for (const node of nodes) {
+        const fixed = queueNodeFixes(doc, node, cfg, builder);
+        if (fixed > 0) {
+            fixedCount += fixed;
+            nodeCount++;
+        }
+    }
+    return { cmd: fixedCount > 0 ? builder.createCommand() : null, fixedCount, nodeCount, reason: null };
 }
 
 // ============================================================
@@ -399,7 +428,10 @@ function main() {
 
     const selected = doc.selection.nodes.toArray();
 
-    const cfg = showDialog({
+    const { Dialog, DialogResult } = require('/dialog.js');
+    const { UnitType } = require('/units.js');
+
+    const dlg = buildDialog(Dialog, UnitType, {
         scope: SCOPE_KEYS.includes(CONFIG.SCOPE) ? CONFIG.SCOPE : SCOPE_KEYS[0],
         inkLimitPercent: isFinite(Number(CONFIG.INK_LIMIT)) ? Number(CONFIG.INK_LIMIT) : 0,
         excludePureBlack: CONFIG.EXCLUDE_PURE_BLACK !== false,
@@ -409,37 +441,33 @@ function main() {
         fill: CONFIG.FILL !== false,
         stroke: CONFIG.STROKE !== false,
     });
-    if (!cfg) return;
 
-    if (cfg.inkLimit <= 0 && cfg.overprintBlack <= 0 && !cfg.removeWhiteOverprint) {
-        alert('Nothing to do - the ink limit and overprint-black percentage were both left at 0, ' +
-            'and "Turn off overprint on white" was left unchecked.');
-        return;
-    }
+    let last = { cmd: null, fixedCount: 0, nodeCount: 0, reason: null };
+    const update = (preview) => {
+        last = buildFixCommand(doc, selected, readOptions(dlg));
+        if (last.cmd) doc.executeCommand(last.cmd, preview);
+        else doc.clearPreviews();
+        return last;
+    };
 
-    const roots = resolveRoots(doc, cfg, selected);
-    if (!roots) return;
+    dlg.onControlValueChangedHandler = () => update(true);
+    update(true);
 
-    const nodes = collectNodes(roots);
-    const builder = CompoundCommandBuilder.create();
-    let fixedCount = 0;
-    let nodeCount = 0;
-    for (const node of nodes) {
-        const fixed = queueNodeFixes(doc, node, cfg, builder);
-        if (fixed > 0) {
-            fixedCount += fixed;
-            nodeCount++;
+    if (dlg.runModal() === DialogResult.Ok) {
+        const result = update(false);
+        if (result.reason === 'noSelection') {
+            alert('Nothing is selected - select some objects first, or choose "Whole document" in the dialog.');
+        } else if (result.reason === 'nothingToDo') {
+            alert('Nothing to do - the ink limit and overprint-black percentage were both left at 0, ' +
+                'and "Turn off overprint on white" was left unchecked.');
+        } else if (result.fixedCount === 0) {
+            alert('Nothing needed fixing.');
+        } else {
+            alert('Fixed ' + result.fixedCount + ' paint' + (result.fixedCount === 1 ? '' : 's') + ' across ' +
+                result.nodeCount + ' object' + (result.nodeCount === 1 ? '' : 's') + '.');
         }
     }
-
-    if (fixedCount === 0) {
-        alert('Nothing needed fixing.');
-        return;
-    }
-
-    doc.executeCommand(builder.createCommand());
-    alert('Fixed ' + fixedCount + ' paint' + (fixedCount === 1 ? '' : 's') + ' across ' +
-        nodeCount + ' object' + (nodeCount === 1 ? '' : 's') + '.');
+    doc.clearPreviews();
 }
 
 try {

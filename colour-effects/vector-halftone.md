@@ -10,8 +10,12 @@ own tone, as one undo step.
    **Run** - or, to keep it around, click **Save As...** to save it to the
    Script Library (**Window > Scripting > Script Library**), then click it
    there to run it any time.
-3. A dialog opens for the settings below - change what you want and click
-   **OK**, or **Cancel** to back out without changing anything.
+3. A dialog opens for the settings below. Combo boxes and checkboxes
+   preview the actual dots live; while dragging a slider you'll see a
+   quick dot-count estimate instead (rendering live from a real bitmap on
+   every tick of a drag would be too slow) - let go, and it snaps to the
+   real preview. Click **OK** to keep it, or **Cancel** to back out
+   without changing anything.
 
 ## Purpose
 
@@ -46,9 +50,10 @@ is in each cell of a grid turned by your chosen screen angle.
 
 - **Real vector output** — dots are actual editable paths, not a raster
   effect
-- **A settings dialog** — opens pre-filled with `CONFIG`'s values, so you
-  can either edit `CONFIG` for new defaults or just change things in the
-  dialog each time
+- **A settings dialog with a live preview** — opens pre-filled with
+  `CONFIG`'s values; combo boxes and checkboxes preview the real dots
+  immediately, sliders show a quick estimate while dragging and the real
+  dots once released
 - **Genuine colour-managed CMYK separation** in `"cmyk"` mode, not a naive
   conversion
 - **Five dot shapes** — circle, ellipse, square, diamond, line
@@ -89,14 +94,25 @@ is in each cell of a grid turned by your chosen screen angle.
   else in the selection - there's no separate "image couldn't be decoded"
   warning the way VectorCraft's own tool gives; a render that comes out
   blank there would still just sample as blank here.
-- **The dialog couldn't be tested the way this project's other scripts
-  are** - Affinity's scripting SDK's dialogs only run in the native
-  Scripts panel, not through this project's own MCP-based test tool, so
-  this one was checked carefully against the SDK's own source rather than
-  run live before shipping. Flag it if it misbehaves.
+- **The dialog UI itself couldn't be tested the way this project's other
+  scripts are** - Affinity's scripting SDK's dialogs only run in the
+  native Scripts panel, not through this project's own MCP-based test
+  tool. The preview mechanics underneath it (that an add-plus-delete
+  compound reverts cleanly) were confirmed directly, since that doesn't
+  need a dialog to test - but the dialog's own controls, wiring, and
+  specifically whether a slider's `transient` flag behaves as assumed
+  (true while dragging, false on release or on any discrete control)
+  were only checked against the SDK's source, not run live. Flag it if
+  it misbehaves - in particular if the slider estimate never snaps to a
+  real preview, or if the real preview runs on every drag tick and feels
+  slow.
 
 ## Changelog
 
+1.2.0 - The dialog now live-previews the actual dots as you change a
+combo box or checkbox, and a quick dot-count estimate while dragging a
+frequency/angle slider (snapping to the real preview on release) - the
+full render-and-sample pass is too slow to run on every drag tick.
 1.1.0 - Replaced the CONFIG-only workflow with a settings dialog (opens
 pre-filled from CONFIG's values); CONFIG now only sets the dialog's
 defaults.

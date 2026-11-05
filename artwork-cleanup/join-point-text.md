@@ -10,8 +10,9 @@ as one undo step. Does not touch **Frame Text**.
    **Run** — or, to keep it around, click **Save As...** to save it to the
    Script Library (**Window > Scripting > Script Library**), then click it
    there to run it any time.
-3. A small dialog opens for the one setting below - adjust it and click
-   **OK**, or **Cancel** to back out without joining anything.
+3. A small dialog opens for the one setting below, previewing the actual
+   join live on the real objects as you move the slider - click **OK**
+   to keep it, or **Cancel** to back out without joining anything.
 
 ## Purpose
 
@@ -57,9 +58,9 @@ why.
 
 ## Features
 
-- **A same-line tolerance dialog** — opens pre-filled with `CONFIG`'s value,
-  so you can either edit `CONFIG` for a new default or just change it in
-  the dialog each time
+- **A same-line tolerance dialog with a live preview** — opens pre-filled
+  with `CONFIG`'s value, and redraws the actual joined object on the
+  canvas as you move the slider, before you ever click OK
 - **Keeps character styling** — each piece's own font, size, colour and
   tracking survive
 - **Rebuilds real paragraph structure**: actual line breaks, left alignment,
@@ -101,14 +102,18 @@ no per-glyph position API in the Affinity SDK:
   documented in `combine-point-text.md`.
 - **A cap of 5,000 objects** across the selection refuses to run rather than
   let a pathologically large selection hang.
-- **The dialog couldn't be tested the way this project's other scripts
-  are** - Affinity's scripting SDK's dialogs only run in the native
-  Scripts panel, not through this project's own MCP-based test tool, so
-  this one was checked carefully against the SDK's own source rather than
-  run live before shipping. Flag it if it misbehaves.
+- **The dialog UI itself couldn't be tested the way this project's other
+  scripts are** - Affinity's scripting SDK's dialogs only run in the
+  native Scripts panel, not through this project's own MCP-based test
+  tool. The live-preview mechanics underneath it were confirmed directly
+  (that doesn't need a dialog to test), but the dialog's own wiring was
+  only checked against the SDK's source, not run live. Flag it if it
+  misbehaves.
 
 ## Changelog
 
+1.2.0 - The dialog now live-previews the actual join on the real objects
+as the slider moves, instead of only applying it after clicking OK.
 1.1.0 - Replaced the CONFIG-only workflow for the same-line tolerance with a
 small settings dialog (opens pre-filled from CONFIG's value); CONFIG now
 only sets the dialog's default.

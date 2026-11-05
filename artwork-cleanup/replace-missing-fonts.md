@@ -11,7 +11,8 @@ available, and replaces it with a font you choose, as one undo step.
    press **Run** — or, to keep it around, click **Save As...** to save it
    to the Script Library (**Window > Scripting > Script Library**), then
    click it there to run it any time.
-3. A small dialog opens asking for the replacement font's family name -
+3. A small dialog opens asking for the replacement font's family name,
+   live-previewing the actual replacement on the canvas as you type -
    type it and click **OK**, or **Cancel** to back out without changing
    anything.
 
@@ -53,8 +54,10 @@ walks into.
 
 ## Features
 
-- **A one-field dialog** — no selection needed, just the replacement font's
-  family name, pre-filled from `CONFIG.REPLACEMENT_FONT`
+- **A one-field dialog with a live preview** — no selection needed, just
+  the replacement font's family name, pre-filled from
+  `CONFIG.REPLACEMENT_FONT`, with the actual text on the canvas updating
+  as you type
 - **Keeps bold/italic styling** — a run's closest matching style in the
   replacement family is used, not always its plain Regular
 - **Checks the whole document**, every page, not just what's in front of
@@ -83,14 +86,18 @@ walks into.
   them replaced with two different families, this can't tell them apart
   in a single run - it fixes everything missing with whatever family name
   you typed into the dialog.
-- **The dialog couldn't be tested the way this project's other scripts
-  are** - Affinity's scripting SDK's dialogs only run in the native
-  Scripts panel, not through this project's own MCP-based test tool, so
-  this one was checked carefully against the SDK's own source rather than
-  run live before shipping. Flag it if it misbehaves.
+- **The dialog UI itself couldn't be tested the way this project's other
+  scripts are** - Affinity's scripting SDK's dialogs only run in the
+  native Scripts panel, not through this project's own MCP-based test
+  tool. The live-preview mechanics underneath it were confirmed directly
+  (that doesn't need a dialog to test), but the dialog's own wiring was
+  only checked against the SDK's source, not run live. Flag it if it
+  misbehaves.
 
 ## Changelog
 
+1.2.0 - The dialog now live-previews the actual font replacement on the
+canvas as you type, instead of only applying it after clicking OK.
 1.1.0 - Replaced the CONFIG-only workflow with a one-field settings dialog
 (opens pre-filled from CONFIG.REPLACEMENT_FONT); CONFIG now only sets the
 dialog's default.

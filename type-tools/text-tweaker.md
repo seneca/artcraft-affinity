@@ -12,8 +12,9 @@ live and fully editable afterward.
    **Run** - or, to keep it around, click **Save As...** to save it to the
    Script Library (**Window > Scripting > Script Library**), then click it
    there to run it any time.
-3. A dialog opens for the settings below - change what you want and click
-   **OK**, or **Cancel** to back out without changing anything.
+3. A dialog opens for the settings below, previewing the ramp live on the
+   actual text as you change anything - click **OK** to keep it, or
+   **Cancel** to back out without changing anything.
 
 ## Purpose
 
@@ -43,9 +44,9 @@ that could come undone.
 
 ## Features
 
-- **A settings dialog** — opens pre-filled with `CONFIG`'s values, so you
-  can either edit `CONFIG` for new defaults or just change things in the
-  dialog each time
+- **A settings dialog with a live preview** — opens pre-filled with
+  `CONFIG`'s values, and updates the actual text on the canvas as you
+  change anything, before you ever click OK
 - **The text stays completely live** — select it, retype it, restyle it
   afterward like anything else
 - **Five shapes** — straight, ease, bow, spike, random
@@ -101,14 +102,20 @@ that could come undone.
   way VectorCraft's own tool does - whatever was last typed (or `CONFIG`'s
   starting values) carries over when you switch Attribute, so re-check
   From/To's units after changing it.
-- **The dialog couldn't be tested the way this project's other scripts
-  are** - Affinity's scripting SDK's dialogs only run in the native
-  Scripts panel, not through this project's own MCP-based test tool, so
-  this one was checked carefully against the SDK's own source rather than
-  run live before shipping. Flag it if it misbehaves.
+- **The dialog UI itself couldn't be tested the way this project's other
+  scripts are** - Affinity's scripting SDK's dialogs only run in the
+  native Scripts panel, not through this project's own MCP-based test
+  tool. The live-preview *mechanics* underneath it (`executeCommand(cmd,
+  true)`/`clearPreviews()`, and that a second preview always replaces the
+  first rather than stacking) were confirmed directly, since those don't
+  need a dialog to test - but the dialog's own controls and wiring were
+  only checked against the SDK's source, not run live. Flag it if it
+  misbehaves.
 
 ## Changelog
 
+1.2.0 - The dialog now live-previews the ramp on the actual text as you
+change any setting, instead of only applying it after clicking OK.
 1.1.0 - Replaced the CONFIG-only workflow with a settings dialog (opens
 pre-filled from CONFIG's values); CONFIG now only sets the dialog's
 defaults.

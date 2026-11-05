@@ -46,14 +46,18 @@ Description:    Approximate port of VectorCraft's Artwork Cleanup > Join Point T
                  /dialog.js) rather than a CONFIG edit - CONFIG.SAME_LINE_FRACTION below only
                  supplies the value the dialog opens with. Loaded lazily inside main(), after the
                  selection is captured, since requiring /dialog.js clears the live selection as a
-                 side effect (same convention as rejoin-path-pieces.js/simplify-anchors.js). Note
-                 for future maintenance: dialogs can't be driven by this project's own MCP test
-                 tool (it only runs in the native Scripts panel), so this wiring was checked
-                 carefully against /dialog.js's own source but not exercised live - test it for
-                 real before relying on it.
+                 side effect (same convention as rejoin-path-pieces.js/simplify-anchors.js). The
+                 dialog live-previews the actual join on the real objects as the slider moves -
+                 confirmed directly via this project's own test tool that this script's add-one-
+                 node-plus-delete-pieces compound reverts cleanly from a preview (the same as a
+                 plain add) and is cheap enough (text merging, no rendering) to recompute on every
+                 change. Note for future maintenance: the dialog UI itself still can't be driven by
+                 this project's own MCP test tool (it only runs in the native Scripts panel), so
+                 its wiring was checked carefully against /dialog.js's own source but not exercised
+                 live - test it for real before relying on it.
 
 Author:         Les Pruszynski (Middledot)
-Version:        1.1.0
+Version:        1.2.0
 Created:        04/11/2026
 Last updated:   05/11/2026
 Compatibility:  Affinity by Canva 3.3
@@ -276,18 +280,33 @@ function main() {
         'Same-line tolerance (fraction of line height)', UnitType.Number, UnitType.Number,
         CONFIG.SAME_LINE_FRACTION, 0, 2
     ).setShowPopupSlider(true);
-    if (dlg.runModal() !== DialogResult.Ok) return;
-    CONFIG.SAME_LINE_FRACTION = sameLineEditor.value;
 
-    const result = buildCommand(doc, roots);
-    if (!result.cmd) {
-        alert('Select two or more one-line point text objects to join');
-        return;
+    // Confirmed directly via this project's own test tool: an add-one-node-plus-delete-pieces
+    // compound (what buildCommand builds) reverts cleanly from a preview, the same as a plain
+    // add, and is cheap (text merging, no rendering) - safe and fast enough to live-preview on
+    // every change, unlike vector-halftone.js's rendering-heavy case.
+    let last = { cmd: null, joined: 0, lines: 0 };
+    const update = (preview) => {
+        CONFIG.SAME_LINE_FRACTION = sameLineEditor.value;
+        last = buildCommand(doc, roots);
+        if (last.cmd) doc.executeCommand(last.cmd, preview);
+        else doc.clearPreviews();
+        return last;
+    };
+
+    dlg.onControlValueChangedHandler = () => update(true);
+    update(true);
+
+    if (dlg.runModal() === DialogResult.Ok) {
+        const result = update(false);
+        if (!result.cmd) {
+            alert('Select two or more one-line point text objects to join');
+        } else {
+            alert('Joined ' + result.joined + ' piece' + (result.joined === 1 ? '' : 's') +
+                ' into one object (' + result.lines + ' line' + (result.lines === 1 ? '' : 's') + ').');
+        }
     }
-
-    doc.executeCommand(result.cmd);
-    alert('Joined ' + result.joined + ' piece' + (result.joined === 1 ? '' : 's') +
-        ' into one object (' + result.lines + ' line' + (result.lines === 1 ? '' : 's') + ').');
+    doc.clearPreviews();
 }
 
 try {

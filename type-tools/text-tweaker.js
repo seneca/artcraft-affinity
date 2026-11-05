@@ -58,14 +58,19 @@ Description:    Approximate port of VectorCraft's Type Tools > Text Tweaker. Giv
 
                  Settings come from a dialog (Affinity's own Dialog API, /dialog.js) rather than a
                  CONFIG object you edit by hand - CONFIG below only supplies the values the dialog
-                 opens with. Note for future maintenance: dialogs can't be driven by this project's
-                 own MCP test tool (it only runs in the native Scripts panel), so the dialog's
-                 wiring was checked carefully against /dialog.js and ts/ui.d.ts but not exercised
-                 live the way every other part of this script was - test it for real before
-                 relying on it.
+                 opens with. The dialog live-previews the ramp as you change any setting, the same
+                 way arrange-in-grid.js does: doc.executeCommand(cmd, true) applies the preview,
+                 doc.clearPreviews() reverts it, and - confirmed directly via this project's own
+                 test tool, which can execute preview commands even though it can't open dialogs -
+                 a second preview call always replaces the first rather than stacking on it, so
+                 recomputing the full ramp from CONFIG's From/To on every change is safe and never
+                 compounds. Note for future maintenance: the dialog UI itself still can't be
+                 exercised live (dialogs only run in the native Scripts panel, not through this
+                 project's own MCP test tool) - only the preview mechanics underneath it were
+                 actually tested. Test the dialog for real before relying on it.
 
 Author:         Les Pruszynski (Middledot)
-Version:        1.1.0
+Version:        1.2.0
 Created:        05/11/2026
 Last updated:   05/11/2026
 Compatibility:  Affinity by Canva 3.3
@@ -174,39 +179,37 @@ function isSkippable(ch) {
 // DIALOG
 // ============================================================
 
-// Shows the settings dialog pre-filled from `defaults`. Returns the chosen settings, or null if
-// the dialog was cancelled.
-//
-// Modules that clear the live selection when require()'d (/dialog among them) are loaded lazily,
-// after the selection is captured - see modern-js.md 2.1 in the affinity-scripts-toolkit. This is
-// why Dialog/DialogResult/UnitType aren't required at the top of the file: resolveTargets() must
-// read doc.selection before this function (and /dialog.js) is ever touched.
-function showDialog(defaults) {
-    const { Dialog, DialogResult } = require('/dialog.js');
-    const { UnitType } = require('/units.js');
-
-    const dialog = Dialog.create('Text Tweaker');
-    const col = dialog.addColumn();
+// Builds the settings dialog pre-filled from `defaults` and returns it with its controls attached
+// (dlg.attributeBox, dlg.fromEditor, etc.) - not yet run. `Dialog`/`UnitType` are passed in rather
+// than required at module scope, so the live selection (captured in main() before this is called)
+// can't be cleared by loading '/dialog.js' too early - see modern-js.md 2.1 in the
+// affinity-scripts-toolkit.
+function buildDialog(Dialog, UnitType, defaults) {
+    const dlg = Dialog.create('Text Tweaker');
+    const col = dlg.addColumn();
     const grp = col.addGroup('Settings');
 
     const attributeIndex = Math.max(0, ATTRIBUTE_KEYS.indexOf(defaults.attribute));
-    const attributeBox = grp.addComboBox('Attribute', ATTRIBUTE_LABELS, attributeIndex);
-    const fromEditor = grp.addUnitValueEditor('From', UnitType.Number, UnitType.Number, defaults.from);
-    const toEditor = grp.addUnitValueEditor('To', UnitType.Number, UnitType.Number, defaults.to);
+    dlg.attributeBox = grp.addComboBox('Attribute', ATTRIBUTE_LABELS, attributeIndex);
+    dlg.fromEditor = grp.addUnitValueEditor('From', UnitType.Number, UnitType.Number, defaults.from).setShowPopupSlider(true);
+    dlg.toEditor = grp.addUnitValueEditor('To', UnitType.Number, UnitType.Number, defaults.to).setShowPopupSlider(true);
     const shapeIndex = Math.max(0, SHAPE_KEYS.indexOf(defaults.shape));
-    const shapeBox = grp.addComboBox('Shape', SHAPE_LABELS, shapeIndex);
-    const seedEditor = grp.addUnitValueEditor('Random seed (Shape = Random only)', UnitType.Number, UnitType.Number, defaults.seed);
-    const skipSpacesBox = grp.addCheckBox('Skip spaces and line breaks', defaults.skipSpaces);
+    dlg.shapeBox = grp.addComboBox('Shape', SHAPE_LABELS, shapeIndex);
+    dlg.seedEditor = grp.addUnitValueEditor('Random seed (Shape = Random only)', UnitType.Number, UnitType.Number, defaults.seed);
+    dlg.skipSpacesBox = grp.addCheckBox('Skip spaces and line breaks', defaults.skipSpaces);
 
-    if (dialog.runModal() !== DialogResult.Ok) return null;
+    return dlg;
+}
 
+// The dialog's current control values, as a plain cfg object.
+function readOptions(dlg) {
     return {
-        attribute: ATTRIBUTE_KEYS[attributeBox.selectedIndex],
-        from: fromEditor.value,
-        to: toEditor.value,
-        shape: SHAPE_KEYS[shapeBox.selectedIndex],
-        seed: Math.trunc(seedEditor.value) || 0,
-        skipSpaces: skipSpacesBox.value,
+        attribute: ATTRIBUTE_KEYS[dlg.attributeBox.selectedIndex],
+        from: dlg.fromEditor.value,
+        to: dlg.toEditor.value,
+        shape: SHAPE_KEYS[dlg.shapeBox.selectedIndex],
+        seed: Math.trunc(dlg.seedEditor.value) || 0,
+        skipSpaces: dlg.skipSpacesBox.value,
     };
 }
 
@@ -215,8 +218,12 @@ function showDialog(defaults) {
 // ============================================================
 
 // Tweaks the characters of `node` in [start, end) (UTF-16 code-unit offsets, matching `node.text`
-// indexing directly), queuing one createFormatText command per changed character. Returns how
-// many characters changed.
+// indexing directly), queuing one createFormatText command per changed character into `builder`.
+// Returns how many characters changed. Each character's value is always computed fresh from
+// `cfg.from`/`cfg.to` and its position in the ramp, never read back off the node itself - so this
+// is safe to call repeatedly for a live preview without compounding: Affinity's own preview
+// mechanism already resets to the true committed state before each new preview is applied
+// (confirmed directly - a second preview command replaces the first rather than stacking on it).
 function tweakNode(doc, node, start, end, cfg, makeApply, builder) {
     const text = node.text;
     const indices = [];
@@ -243,6 +250,18 @@ function tweakNode(doc, node, start, end, cfg, makeApply, builder) {
         changed++;
     });
     return changed;
+}
+
+// Builds the full compound command for `targets` under `cfg`, without executing it. Returns
+// { cmd, changed } - cmd is null if nothing would change.
+function buildTweakCommand(doc, targets, cfg) {
+    const makeApply = ATTRIBUTES[cfg.attribute];
+    const builder = CompoundCommandBuilder.create();
+    let changed = 0;
+    for (const { node, start, end } of targets) {
+        changed += tweakNode(doc, node, start, end, cfg, makeApply, builder);
+    }
+    return { cmd: changed > 0 ? builder.createCommand() : null, changed };
 }
 
 // ============================================================
@@ -290,7 +309,10 @@ function main() {
         return;
     }
 
-    const cfg = showDialog({
+    const { Dialog, DialogResult } = require('/dialog.js');
+    const { UnitType } = require('/units.js');
+
+    const dlg = buildDialog(Dialog, UnitType, {
         attribute: ATTRIBUTES[CONFIG.ATTRIBUTE] ? CONFIG.ATTRIBUTE : ATTRIBUTE_KEYS[0],
         from: isFinite(Number(CONFIG.FROM)) ? Number(CONFIG.FROM) : 0,
         to: isFinite(Number(CONFIG.TO)) ? Number(CONFIG.TO) : 0,
@@ -298,23 +320,28 @@ function main() {
         seed: Math.trunc(Number(CONFIG.SEED)) || 0,
         skipSpaces: CONFIG.SKIP_SPACES !== false,
     });
-    if (!cfg) return;
 
-    const makeApply = ATTRIBUTES[cfg.attribute];
-    const builder = CompoundCommandBuilder.create();
-    let totalChanged = 0;
-    for (const { node, start, end } of targets) {
-        totalChanged += tweakNode(doc, node, start, end, cfg, makeApply, builder);
+    let last = { cmd: null, changed: 0 };
+    const update = (preview) => {
+        last = buildTweakCommand(doc, targets, readOptions(dlg));
+        if (last.cmd) doc.executeCommand(last.cmd, preview);
+        else doc.clearPreviews();
+        return last;
+    };
+
+    dlg.onControlValueChangedHandler = () => update(true);
+    update(true);
+
+    if (dlg.runModal() === DialogResult.Ok) {
+        const result = update(false);
+        if (result.changed === 0) {
+            alert('Nothing to change - there were no characters in range (after skipping spaces, if that option is on).');
+        } else {
+            alert('Tweaked ' + result.changed + ' character' + (result.changed === 1 ? '' : 's') + ' across ' +
+                targets.length + ' object' + (targets.length === 1 ? '' : 's') + '.');
+        }
     }
-
-    if (totalChanged === 0) {
-        alert('Nothing to change - there were no characters in range (after skipping spaces, if that option is on).');
-        return;
-    }
-
-    doc.executeCommand(builder.createCommand());
-    alert('Tweaked ' + totalChanged + ' character' + (totalChanged === 1 ? '' : 's') + ' across ' +
-        targets.length + ' object' + (targets.length === 1 ? '' : 's') + '.');
+    doc.clearPreviews();
 }
 
 try {
