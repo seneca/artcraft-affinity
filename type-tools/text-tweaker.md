@@ -67,6 +67,13 @@ that could come undone.
   points. The dialog's From/To fields are plain numbers - they don't
   relabel themselves per attribute, so keep the chosen attribute's units
   in mind when typing a value.
+- **Size** and **Leading** only let From/To go positive (and Size can't
+  go to zero either) - a font size or line height of zero or less isn't
+  meaningful, so those two don't offer a slider that could suggest
+  otherwise. Switching Attribute to or from one of these two swaps in a
+  different From/To field pair with the right range for it, carrying the
+  value across - everything else shares one signed pair that ramps
+  through negative values normally.
 - `"bow"` and `"spike"` both rise from `CONFIG.FROM` at both ends to
   `CONFIG.TO` in the middle - `"bow"` smoothly, `"spike"` as a sharp
   triangular peak. `"ease"` runs start-to-end like `"straight"` but eases
@@ -79,15 +86,10 @@ that could come undone.
 
 ## Known limitations
 
-- **From/To are clamped to -1000..1000.** Needed so the dialog's popup
-  slider has a real range to work with - type a value directly if you
-  need something outside it (the field will clamp it back in).
-- **`"size"` and `"leading"` additionally floor at 0.001 and 0, even
-  within -1000..1000** - confirmed directly, live: Affinity's own
-  `GlyphAtts.height`/`absoluteLeading` throw an error below those
-  (a font size or line height of zero or less isn't meaningful anyway).
-  `"baselineShift"` and `"tracking"` have no such floor and ramp through
-  negative values normally, same as always.
+- **From/To are clamped to -1000..1000** (0.001..1000 for Size/Leading,
+  see Usage tips) - needed so the dialog's popup slider has a real range
+  to work with. Type a value directly if you need something outside it
+  (the field will clamp it back in).
 - **`"rotation"` isn't included.** Confirmed directly: Affinity's own
   character-styling model (`GlyphAtts`) has no per-character rotation
   attribute at all - only a shear/skew property, which slants a letter
@@ -119,10 +121,19 @@ that could come undone.
   first rather than stacking) were confirmed directly, since those don't
   need a dialog to test - but the dialog's own controls and wiring were
   only checked against the SDK's source, not run live. Flag it if it
-  misbehaves.
+  misbehaves - **especially** From/To's field-pair swap when switching
+  Attribute (see Usage tips): this is the first time this project has
+  hidden/shown a dialog control rather than just enabling/disabling it,
+  so check there's no leftover blank gap where the hidden pair was.
 
 ## Changelog
 
+1.3.0 - From/To no longer just silently floor "size"/"leading" below
+the surface - the dialog now shows a genuinely different field pair for
+those two (0.001..1000, no negative numbers offered at all) than for
+everything else (-1000..1000, unchanged). Switching Attribute between
+the two groups carries the current value across, clamped to the new
+pair's own range.
 1.2.5 - Fixed a real crash: dragging From/To through zero or negative
 while "size" or "leading" was selected threw `INVALID_ARGS` from
 Affinity's own `GlyphAtts` (confirmed directly, live, that `height`

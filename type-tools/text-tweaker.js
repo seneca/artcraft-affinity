@@ -70,7 +70,7 @@ Description:    Approximate port of VectorCraft's Type Tools > Text Tweaker. Giv
                  actually tested. Test the dialog for real before relying on it.
 
 Author:         Les Pruszynski (Middledot)
-Version:        1.2.5
+Version:        1.3.0
 Created:        05/11/2026
 Last updated:   05/11/2026
 Compatibility:  Affinity by Canva 3.3
@@ -155,6 +155,14 @@ const SHAPE_LABELS = ['Straight', 'Ease', 'Bow', 'Spike', 'Random'];
 // From/To fields' slider bound - see buildDialog's own comment on why this needs to be a real,
 // explicit range rather than left "unbounded".
 const FROM_TO_BOUND = 1000;
+const POSITIVE_FROM_TO_MIN = 0.001;
+
+// "size" and "leading" can't go to zero or negative (see the ATTRIBUTES map above) - everything
+// else can and does use negative values for real effects (shifting up, tightening). The dialog
+// shows a different From/To field pair for each group, see buildDialog's own comment on why.
+function isPositiveOnlyAttribute(attribute) {
+    return attribute === 'size' || attribute === 'leading';
+}
 
 // ============================================================
 // SHAPES
@@ -190,14 +198,18 @@ function isSkippable(ch) {
     return /\s/.test(ch) || ch.codePointAt(0) < 32;
 }
 
+function clamp(v, lo, hi) {
+    return Math.max(lo, Math.min(hi, v));
+}
+
 // ============================================================
 // DIALOG
 // ============================================================
 
 // Builds the settings dialog pre-filled from `defaults` and returns it with its controls attached
-// (dlg.attributeBox, dlg.fromEditor, etc.) - not yet run. `Dialog`/`UnitType` are passed in rather
-// than required at module scope, so the live selection (captured in main() before this is called)
-// can't be cleared by loading '/dialog.js' too early - see modern-js.md 2.1 in the
+// (dlg.attributeBox, dlg.fromPositiveEditor, etc.) - not yet run. `Dialog`/`UnitType` are passed
+// in rather than required at module scope, so the live selection (captured in main() before this
+// is called) can't be cleared by loading '/dialog.js' too early - see modern-js.md 2.1 in the
 // affinity-scripts-toolkit.
 function buildDialog(Dialog, UnitType, defaults) {
     const dlg = Dialog.create('Text Tweaker');
@@ -206,17 +218,40 @@ function buildDialog(Dialog, UnitType, defaults) {
 
     const attributeIndex = Math.max(0, ATTRIBUTE_KEYS.indexOf(defaults.attribute));
     dlg.attributeBox = grp.addComboBox('Attribute', ATTRIBUTE_LABELS, attributeIndex);
+
     // An explicit min/max is required for the popup slider to have any travel at all: reading
     // DialogGroup.addUnitValueEditor in /dialog.js shows that omitting them defaults both to
-    // `defaults.from`/`defaults.to` themselves (a zero-width range) before the separate "no
-    // min/no max" flag gets applied, by which point the slider widget has already been sized
-    // from that zero-width min/max - this is why the slider couldn't be dragged at all, not a
-    // live-preview wiring issue (confirmed from the SDK's own source, not run live). The bound
-    // is deliberately kept well short of a real "unbounded" range, the same tradeoff
-    // arrange-in-grid.js's GAP_MIN_PT/GAP_MAX_PT documents for the same reason (a huge range
-    // makes the slider too coarse to be useful) - type a value directly for anything outside it.
-    dlg.fromEditor = grp.addUnitValueEditor('From', UnitType.Number, UnitType.Number, defaults.from, -FROM_TO_BOUND, FROM_TO_BOUND).setShowPopupSlider(true).setPrecision(1);
-    dlg.toEditor = grp.addUnitValueEditor('To', UnitType.Number, UnitType.Number, defaults.to, -FROM_TO_BOUND, FROM_TO_BOUND).setShowPopupSlider(true).setPrecision(1);
+    // the field's own initial value (a zero-width range) before the separate "no min/no max"
+    // flag gets applied, by which point the slider widget has already been sized from that
+    // zero-width min/max - this is why the slider couldn't be dragged at all, not a live-preview
+    // wiring issue (confirmed from the SDK's own source, not run live). The bound is deliberately
+    // kept well short of a real "unbounded" range, the same tradeoff arrange-in-grid.js's
+    // GAP_MIN_PT/GAP_MAX_PT documents for the same reason (a huge range makes the slider too
+    // coarse to be useful) - type a value directly for anything outside it.
+    //
+    // There are two separate From/To field *pairs* here, not one: a UnitValueEditor's min/max is
+    // fixed at creation with no API to change it afterward, but "size"/"leading" need a
+    // positive-only range while every other attribute needs a signed one - one shared pair could
+    // only ever be right for one of those two groups. Both pairs share the same "From"/"To"
+    // labels and only one pair is ever visible at a time (toggled in syncFromToVisibility, below,
+    // whenever the selected Attribute crosses between the two groups) so this looks like one
+    // field to the user. This is the first time this project has swapped a dialog control's
+    // visibility rather than just enabling/disabling it - untested live (same as every other part
+    // of this dialog's own UI), so confirm there's no leftover blank gap where the hidden pair was.
+    const startsPositive = isPositiveOnlyAttribute(defaults.attribute);
+    const startFrom = clamp(defaults.from, startsPositive ? POSITIVE_FROM_TO_MIN : -FROM_TO_BOUND, FROM_TO_BOUND);
+    const startTo = clamp(defaults.to, startsPositive ? POSITIVE_FROM_TO_MIN : -FROM_TO_BOUND, FROM_TO_BOUND);
+
+    dlg.fromPositiveEditor = grp.addUnitValueEditor('From', UnitType.Number, UnitType.Number, startsPositive ? startFrom : POSITIVE_FROM_TO_MIN, POSITIVE_FROM_TO_MIN, FROM_TO_BOUND).setShowPopupSlider(true).setPrecision(1);
+    dlg.toPositiveEditor = grp.addUnitValueEditor('To', UnitType.Number, UnitType.Number, startsPositive ? startTo : POSITIVE_FROM_TO_MIN, POSITIVE_FROM_TO_MIN, FROM_TO_BOUND).setShowPopupSlider(true).setPrecision(1);
+    dlg.fromSignedEditor = grp.addUnitValueEditor('From', UnitType.Number, UnitType.Number, startsPositive ? 0 : startFrom, -FROM_TO_BOUND, FROM_TO_BOUND).setShowPopupSlider(true).setPrecision(1);
+    dlg.toSignedEditor = grp.addUnitValueEditor('To', UnitType.Number, UnitType.Number, startsPositive ? 0 : startTo, -FROM_TO_BOUND, FROM_TO_BOUND).setShowPopupSlider(true).setPrecision(1);
+    dlg.fromPositiveEditor.setIsVisible(startsPositive);
+    dlg.toPositiveEditor.setIsVisible(startsPositive);
+    dlg.fromSignedEditor.setIsVisible(!startsPositive);
+    dlg.toSignedEditor.setIsVisible(!startsPositive);
+    dlg._positiveGroupShown = startsPositive;
+
     const shapeIndex = Math.max(0, SHAPE_KEYS.indexOf(defaults.shape));
     dlg.shapeBox = grp.addComboBox('Shape', SHAPE_LABELS, shapeIndex);
     dlg.seedEditor = grp.addUnitValueEditor('Random seed (Shape = Random only)', UnitType.Number, UnitType.Number, defaults.seed).setPrecision(0);
@@ -225,12 +260,39 @@ function buildDialog(Dialog, UnitType, defaults) {
     return dlg;
 }
 
-// The dialog's current control values, as a plain cfg object.
+// Shows whichever From/To field pair matches the currently-selected Attribute, carrying the
+// previous pair's value across (clamped to the new pair's own range) when the selection just
+// crossed between the positive-only and signed groups. Must run before readOptions reads
+// From/To's value on every update, not just when Attribute's own control fires, since this
+// project's dialogs re-derive everything from scratch on every change anyway.
+function syncFromToVisibility(dlg) {
+    const attribute = ATTRIBUTE_KEYS[dlg.attributeBox.selectedIndex];
+    const positive = isPositiveOnlyAttribute(attribute);
+    if (positive === dlg._positiveGroupShown) return;
+
+    if (positive) {
+        dlg.fromPositiveEditor.value = clamp(dlg.fromSignedEditor.value, POSITIVE_FROM_TO_MIN, FROM_TO_BOUND);
+        dlg.toPositiveEditor.value = clamp(dlg.toSignedEditor.value, POSITIVE_FROM_TO_MIN, FROM_TO_BOUND);
+    } else {
+        dlg.fromSignedEditor.value = clamp(dlg.fromPositiveEditor.value, -FROM_TO_BOUND, FROM_TO_BOUND);
+        dlg.toSignedEditor.value = clamp(dlg.toPositiveEditor.value, -FROM_TO_BOUND, FROM_TO_BOUND);
+    }
+    dlg.fromPositiveEditor.setIsVisible(positive);
+    dlg.toPositiveEditor.setIsVisible(positive);
+    dlg.fromSignedEditor.setIsVisible(!positive);
+    dlg.toSignedEditor.setIsVisible(!positive);
+    dlg._positiveGroupShown = positive;
+}
+
+// The dialog's current control values, as a plain cfg object. Call syncFromToVisibility(dlg)
+// first - this reads whichever From/To pair that leaves visible.
 function readOptions(dlg) {
+    const attribute = ATTRIBUTE_KEYS[dlg.attributeBox.selectedIndex];
+    const positive = isPositiveOnlyAttribute(attribute);
     return {
-        attribute: ATTRIBUTE_KEYS[dlg.attributeBox.selectedIndex],
-        from: dlg.fromEditor.value,
-        to: dlg.toEditor.value,
+        attribute,
+        from: positive ? dlg.fromPositiveEditor.value : dlg.fromSignedEditor.value,
+        to: positive ? dlg.toPositiveEditor.value : dlg.toSignedEditor.value,
         shape: SHAPE_KEYS[dlg.shapeBox.selectedIndex],
         seed: Math.trunc(dlg.seedEditor.value) || 0,
         skipSpaces: dlg.skipSpacesBox.value,
@@ -347,6 +409,7 @@ function main() {
 
     let last = { cmd: null, changed: 0 };
     const update = (preview) => {
+        syncFromToVisibility(dlg);
         last = buildTweakCommand(doc, targets, readOptions(dlg));
         if (last.cmd) doc.executeCommand(last.cmd, preview);
         else doc.clearPreviews();
