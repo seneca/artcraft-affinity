@@ -79,6 +79,9 @@ that could come undone.
 
 ## Known limitations
 
+- **From/To are clamped to -1000..1000.** Needed so the dialog's popup
+  slider has a real range to work with - type a value directly if you
+  need something outside it (the field will clamp it back in).
 - **`"rotation"` isn't included.** Confirmed directly: Affinity's own
   character-styling model (`GlyphAtts`) has no per-character rotation
   attribute at all - only a shear/skew property, which slants a letter
@@ -114,6 +117,12 @@ that could come undone.
 
 ## Changelog
 
+1.2.3 - Found and fixed the actual reason From/To's sliders couldn't be
+dragged at all: they had no explicit min/max, which (per /dialog.js's
+own source) gives the popup slider a zero-width range to work with
+until a separate "unbounded" flag is applied too late to help - not a
+live-preview problem. Both fields now have a real, generous range
+(-1000 to 1000); type a value directly for anything outside it.
 1.2.2 - Restored From/To's popup sliders (briefly removed in 1.2.1) -
 the real cause of the live preview appearing not to work turned out to
 be a bug in vector-halftone.js's dialog, not a general problem with

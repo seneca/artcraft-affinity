@@ -70,7 +70,7 @@ Description:    Approximate port of VectorCraft's Type Tools > Text Tweaker. Giv
                  actually tested. Test the dialog for real before relying on it.
 
 Author:         Les Pruszynski (Middledot)
-Version:        1.2.2
+Version:        1.2.3
 Created:        05/11/2026
 Last updated:   05/11/2026
 Compatibility:  Affinity by Canva 3.3
@@ -141,6 +141,10 @@ const ATTRIBUTE_LABELS = [
 const SHAPE_KEYS = ['straight', 'ease', 'bow', 'spike', 'random'];
 const SHAPE_LABELS = ['Straight', 'Ease', 'Bow', 'Spike', 'Random'];
 
+// From/To fields' slider bound - see buildDialog's own comment on why this needs to be a real,
+// explicit range rather than left "unbounded".
+const FROM_TO_BOUND = 1000;
+
 // ============================================================
 // SHAPES
 // ============================================================
@@ -191,8 +195,17 @@ function buildDialog(Dialog, UnitType, defaults) {
 
     const attributeIndex = Math.max(0, ATTRIBUTE_KEYS.indexOf(defaults.attribute));
     dlg.attributeBox = grp.addComboBox('Attribute', ATTRIBUTE_LABELS, attributeIndex);
-    dlg.fromEditor = grp.addUnitValueEditor('From', UnitType.Number, UnitType.Number, defaults.from).setShowPopupSlider(true);
-    dlg.toEditor = grp.addUnitValueEditor('To', UnitType.Number, UnitType.Number, defaults.to).setShowPopupSlider(true);
+    // An explicit min/max is required for the popup slider to have any travel at all: reading
+    // DialogGroup.addUnitValueEditor in /dialog.js shows that omitting them defaults both to
+    // `defaults.from`/`defaults.to` themselves (a zero-width range) before the separate "no
+    // min/no max" flag gets applied, by which point the slider widget has already been sized
+    // from that zero-width min/max - this is why the slider couldn't be dragged at all, not a
+    // live-preview wiring issue (confirmed from the SDK's own source, not run live). The bound
+    // is deliberately kept well short of a real "unbounded" range, the same tradeoff
+    // arrange-in-grid.js's GAP_MIN_PT/GAP_MAX_PT documents for the same reason (a huge range
+    // makes the slider too coarse to be useful) - type a value directly for anything outside it.
+    dlg.fromEditor = grp.addUnitValueEditor('From', UnitType.Number, UnitType.Number, defaults.from, -FROM_TO_BOUND, FROM_TO_BOUND).setShowPopupSlider(true);
+    dlg.toEditor = grp.addUnitValueEditor('To', UnitType.Number, UnitType.Number, defaults.to, -FROM_TO_BOUND, FROM_TO_BOUND).setShowPopupSlider(true);
     const shapeIndex = Math.max(0, SHAPE_KEYS.indexOf(defaults.shape));
     dlg.shapeBox = grp.addComboBox('Shape', SHAPE_LABELS, shapeIndex);
     dlg.seedEditor = grp.addUnitValueEditor('Random seed (Shape = Random only)', UnitType.Number, UnitType.Number, defaults.seed);

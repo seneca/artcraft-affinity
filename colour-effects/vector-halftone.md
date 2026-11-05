@@ -68,7 +68,9 @@ is in each cell of a grid turned by your chosen screen angle.
   work on a smaller selection.
 - **Angle** is the mono screen's angle, or the black screen's in CMYK mode -
   cyan, magenta and yellow sit at their own classic offsets from it
-  automatically.
+  automatically. It's clamped to -360..360 (needed for its slider to
+  have a real range) - type a value directly if you want something
+  outside that.
 - Turn on **Keep the original object** the first time you try a new setting
   on something, so you can compare the dots against the original before
   deciding to replace it.
@@ -110,6 +112,12 @@ is in each cell of a grid turned by your chosen screen angle.
 
 ## Changelog
 
+1.3.1 - Found and fixed the actual reason Angle's slider couldn't be
+dragged at all: it had no explicit min/max, which (per /dialog.js's own
+source) gives the popup slider a zero-width range until a separate
+"unbounded" flag is applied too late to help. Angle now has a real
+range (-360 to 360); Frequency was never affected, since it already
+had one.
 1.3.0 - Found and fixed the real bug behind the live preview appearing
 not to work: the dialog gated the real preview behind the `transient`
 flag, meant to skip the expensive render while a slider was being
