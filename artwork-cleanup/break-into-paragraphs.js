@@ -32,17 +32,21 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ------------------------------------------------------------
 Script Name:    break-into-paragraphs.js
-Description:    Approximate port of VectorCraft's Artwork Cleanup > Break Text (by paragraphs).
-                 Splits each selected Frame Text or Artistic Text object into one Artistic Text
-                 object per paragraph (only where you actually pressed Enter - not per line), as
-                 one undo step. A paragraph that wrapped across several lines in a frame keeps
-                 those line breaks inside its own piece (now explicit, where they were auto-wrap).
-                 Finding those wrap points uses the same probing technique as break-into-lines.js -
-                 see that script's header and break-into-paragraphs.md for why, and the same
-                 per-glyph-position SDK gap that makes all of this approximate.
+Description:    Approximate port of VectorCraft's Artwork Cleanup > Break Text (by paragraphs) -
+                 with one deliberate deviation from VectorCraft's own behaviour. Splits each
+                 selected Frame Text or Artistic Text object into one object per paragraph (only
+                 where you actually pressed Enter - not per line), as one undo step. VectorCraft
+                 always produces point-type pieces, forcing a wrapped paragraph's lines into
+                 forced line breaks since point type can't auto-wrap on its own. A Frame Text
+                 source has no such problem - it has a real width - so each of its paragraphs
+                 becomes a new Frame Text box of that same width instead, left to auto-wrap on
+                 its own exactly as the original did, with no inserted line breaks at all. An
+                 Artistic Text source still becomes Artistic Text pieces, forced line breaks and
+                 all, exactly as before (see break-into-lines.js for why that's still necessary
+                 there). Still approximate: see break-into-paragraphs.md.
 
 Author:         Les Pruszynski (Middledot)
-Version:        1.0.0
+Version:        2.0.0
 Created:        05/11/2026
 Last updated:   05/11/2026
 Compatibility:  Affinity by Canva 3.3
@@ -60,21 +64,20 @@ Contact:        lpruszynski@middledot.com
 // ============================================================
 
 const CONFIG = {
-    // A word is read as starting a new (auto-wrapped) line when adding it makes the probe's
-    // rendered height jump by more than this fraction of the font's own point size - see
-    // break-into-lines.js for how this was picked and verified.
-    LINE_JUMP_FRACTION: 0.5,
     // How many times a probe edit is retried if it doesn't stick before giving up on that object.
     SETTEXT_RETRIES: 3,
-    // Frame Text objects with more words than this are left alone rather than probed word by word.
-    MAX_WORDS_PER_TEXT: 3000,
+    // Text objects with more paragraphs than this are left alone rather than probed one by one.
+    MAX_PARAGRAPHS_PER_TEXT: 2000,
     MAX_OBJECTS: 500,
+    // Added to each new Frame Text box's measured content height, so float rounding in the
+    // measurement can never leave it a hair too short for its own text.
+    FRAME_HEIGHT_MARGIN: 2,
 };
 
 const { AddChildNodesCommandBuilder, CompoundCommandBuilder, DocumentCommand, NodeChildType, NodeMoveType } = require('/commands.js');
 const { Document } = require('/document.js');
 const { Selection, TextSelection } = require('/selections.js');
-const { ArtTextNodeDefinition } = require('/nodes.js');
+const { ArtTextNodeDefinition, FrameTextNodeDefinition } = require('/nodes.js');
 const { StoryBuilder } = require('/storybuilder.js');
 const { ParagraphAtts, ParagraphAlignXType } = require('/paragraphatts.js');
 
@@ -116,7 +119,9 @@ function isOverflowing(node) {
 }
 
 // ============================================================
-// ALIGNMENT (duplicated from break-into-lines.js)
+// ALIGNMENT - only for Artistic Text output (duplicated from break-into-lines.js). A new Frame
+// Text piece keeps the original's real ParagraphAtts verbatim instead - frames support justified
+// text properly, so there's nothing to collapse.
 // ============================================================
 
 function pointAlign(x) {
@@ -147,19 +152,20 @@ function trimRange(text, a, b) {
 }
 
 // ============================================================
-// LINE DETECTION (duplicated from break-into-lines.js)
+// PARAGRAPH DETECTION
 // ============================================================
 
-function atomsOf(text) {
-    const atoms = [];
-    const wordRe = /\S+/g;
-    let m;
-    while ((m = wordRe.exec(text))) atoms.push({ type: 'word', start: m.index, end: m.index + m[0].length });
+// `[start, end)` of every paragraph in `text` - split on real typed paragraph breaks (`\n`) only.
+// A forced line break (`\u2028`) stays inside its paragraph; VectorCraft's own Break Text (by
+// paragraphs) splits the same way.
+function paragraphRanges(text) {
+    const out = [];
+    let a = 0;
     for (let i = 0; i < text.length; i++) {
-        if (text[i] === '\n' || text[i] === '\u2028') atoms.push({ type: 'break', at: i });
+        if (text[i] === '\n') { out.push([a, i]); a = i + 1; }
     }
-    atoms.sort((x, y) => (x.start ?? x.at) - (y.start ?? y.at));
-    return atoms;
+    out.push([a, text.length]);
+    return out;
 }
 
 function setProbeText(doc, probe, s, undos) {
@@ -179,71 +185,40 @@ function probeHeight(probe) {
     return probe.getExactSpreadVisibleBox(true, false).height;
 }
 
-// Every line of `node`'s text as `{start, end, bottomHeight, isParagraphEnd}` - `bottomHeight`
-// is the probe's own rendered height once this line (and everything above it) was in it, used
-// afterwards to place the first line of each paragraph; `isParagraphEnd` is true only when the
-// line's own trailing break is a real typed paragraph break (`\n`), not a forced line break
-// (`\u2028`) or a detected auto-wrap - both of the latter keep the following line in the *same*
-// paragraph. `wrap`: false only reads the forced breaks already in the text (all Point type
-// needs, since it never auto-wraps).
-function scanLines(doc, node, wrap, undos) {
+// Every paragraph of `node`'s text as `{start, end, x, y, height}`. Unlike break-into-lines.js,
+// this never has to guess *where* a paragraph wraps - a new Frame Text piece just gets the same
+// width and wraps on its own, and an Artistic Text piece keeps whatever forced line breaks were
+// already typed into it (point type can't auto-wrap, so there's never a hidden wrap point to
+// find there either). All that's probed for is each paragraph's own size and place:
+// - `y`: the probe's own cumulative rendered height right at this paragraph's start, in the
+//   original's own flow - this preserves whatever gap the original had before this paragraph
+//   (including any "space before" its paragraph style sets), not just "stack with no gap".
+// - `height`/`x`: that paragraph's own text, probed alone at the same width/attributes - its
+//   rendered height (to size a new Frame Text piece) and left edge (`x`, which only matters for
+//   an Artistic Text piece - a new Frame Text piece uses the original frame's own left edge and
+//   lets its own paragraph alignment place the text within it, same as the original did).
+function scanParagraphs(doc, node, undos) {
     const text = node.text;
-    const atoms = atomsOf(text);
-    if (wrap && atoms.filter(a => a.type === 'word').length > CONFIG.MAX_WORDS_PER_TEXT) return null;
+    const ranges = paragraphRanges(text);
+    if (ranges.length > CONFIG.MAX_PARAGRAPHS_PER_TEXT) return null;
 
     const probe = node.duplicate();
     undos.count++;
-    const story = node.storyInterface.story;
 
-    const lines = [];
-    let lineStart = 0;
-    let lastHeight = 0;
-    for (const atom of atoms) {
-        if (atom.type === 'break') {
-            lines.push({ start: lineStart, end: atom.at, bottomHeight: lastHeight, isParagraphEnd: text[atom.at] === '\n' });
-            if (!setProbeText(doc, probe, text.slice(0, atom.at + 1), undos)) return null;
-            lastHeight = probeHeight(probe);
-            lineStart = atom.at + 1;
-            continue;
-        }
-        if (!wrap) continue;
-        if (!setProbeText(doc, probe, text.slice(0, atom.end), undos)) return null;
-        const h = probeHeight(probe);
-        const fontHeight = story.getGlyphAtts(atom.start).height || 1;
-        if (atom.start > lineStart && h - lastHeight > fontHeight * CONFIG.LINE_JUMP_FRACTION) {
-            lines.push({ start: lineStart, end: atom.start, bottomHeight: lastHeight, isParagraphEnd: false });
-            lineStart = atom.start;
-        }
-        lastHeight = h;
-    }
-    if (wrap) {
-        lines.push({ start: lineStart, end: text.length, bottomHeight: lastHeight, isParagraphEnd: true });
-    } else {
-        if (!setProbeText(doc, probe, text, undos)) return null;
-        lines.push({ start: lineStart, end: text.length, bottomHeight: probeHeight(probe), isParagraphEnd: true });
+    const startHeights = [0];
+    for (let i = 0; i < ranges.length - 1; i++) {
+        if (!setProbeText(doc, probe, text.slice(0, ranges[i][1] + 1), undos)) return null;
+        startHeights.push(probeHeight(probe));
     }
 
-    // Group consecutive lines into paragraphs: only a real typed paragraph break ends a group.
-    const groups = [];
-    let group = [];
-    for (const line of lines) {
-        group.push(line);
-        if (line.isParagraphEnd) { groups.push(group); group = []; }
-    }
-    if (group.length) groups.push(group);
-
-    // Each paragraph's own x (its alignment-driven left edge, from its first line probed alone)
-    // and y (that first line's own bottomHeight - the same box-bottom anchor convention
-    // combine-point-text.js/join-point-text.js use).
     const frameTop = node.getExactSpreadVisibleBox(true, false).y;
     const placed = [];
-    for (const g of groups) {
-        const first = g[0];
-        const trimmed = trimRange(text, first.start, first.end);
+    for (let i = 0; i < ranges.length; i++) {
+        const trimmed = trimRange(text, ranges[i][0], ranges[i][1]);
         if (!trimmed) continue;
         if (!setProbeText(doc, probe, text.slice(trimmed[0], trimmed[1]), undos)) return null;
         const box = probe.getExactSpreadVisibleBox(true, false);
-        placed.push({ group: g, x: box.x, y: frameTop + first.bottomHeight });
+        placed.push({ start: trimmed[0], end: trimmed[1], x: box.x, y: frameTop + startHeights[i], height: box.height });
     }
     return placed;
 }
@@ -262,35 +237,40 @@ function sliceIntoBuilder(sb, node, start, end) {
     }
 }
 
-// Builds one paragraph's definition: its lines trimmed and joined with a forced line break
-// (`\u2028`, styled like the end of the line before it) wherever two lines of the same
-// paragraph meet - whether that join was already an explicit break in the text or a detected
-// auto-wrap. Affinity's own leading then spaces these lines exactly as the original paragraph
-// was spaced, since nothing about the paragraph's own font, size or leading has changed - only
-// the paragraph's own top needs placing (`anchor`), not each of its lines.
+// A Frame Text piece: the paragraph's own text and real paragraph attributes (alignment,
+// justify included) copied verbatim, in a new box the same width as the original frame - no
+// forced line breaks inserted; Affinity wraps it on its own, exactly as the original did, since
+// nothing about its font, size, width or leading has changed.
 //
-// NOTE: a bulleted paragraph's bullet is NOT carried over - the Affinity scripting SDK has no
-// list/bullet API at all (checked: nothing on ParagraphAtts or anywhere else). If a future SDK
-// version adds one, this is the place to set it.
-function buildParagraphDefinition(node, placedGroup, anchor) {
-    const text = node.text;
+// NOTE: a bulleted paragraph's bullet is still NOT carried over here either, and for the same
+// reason as the Artistic Text case below - no list/bullet API anywhere in the SDK.
+//
+// NOTE: the original frame's own text insets (if it has any) can't be read via the SDK at all -
+// checked directly, nothing exposes them - so they can't be copied either; the new piece gets
+// Affinity's default insets. For a frame with non-default insets this could make its real wrap
+// width differ slightly from what was measured. See break-into-paragraphs.md.
+function buildFramePieceDefinition(node, piece) {
     const story = node.storyInterface.story;
-    const trimmedLines = placedGroup.group.map(l => trimRange(text, l.start, l.end)).filter(Boolean);
-
     const sb = StoryBuilder.create();
-    for (let i = 0; i < trimmedLines.length; i++) {
-        if (i > 0) {
-            const prevEnd = trimmedLines[i - 1][1];
-            const atts = story.getGlyphAtts(Math.max(0, prevEnd - 1));
-            if (atts) sb.setGlyphAtts(atts);
-            sb.addText('\u2028');
-        }
-        sliceIntoBuilder(sb, node, trimmedLines[i][0], trimmedLines[i][1]);
-    }
+    sliceIntoBuilder(sb, node, piece.start, piece.end);
+    sb.setParagraphAtts(story.getParagraphAtts(piece.start));
+    const frameBox = node.spreadVisibleBox;
+    const box = { x: frameBox.x, y: piece.y, width: frameBox.width, height: piece.height + CONFIG.FRAME_HEIGHT_MARGIN };
+    return FrameTextNodeDefinition.createFromStoryBuilder(box, sb);
+}
+
+// An Artistic Text piece: the paragraph's own text copied verbatim, including any forced line
+// break it already had - point type can't auto-wrap, so there's no hidden wrap point to insert
+// one for, unlike break-into-lines.js's situation. Alignment is collapsed to a point-compatible
+// one the same way break-into-lines.js does.
+function buildPointPieceDefinition(node, piece) {
+    const story = node.storyInterface.story;
+    const sb = StoryBuilder.create();
+    sliceIntoBuilder(sb, node, piece.start, piece.end);
     const atts = ParagraphAtts.create();
-    atts.alignXType = pointAlign(story.getParagraphAtts(trimmedLines[0][0]).alignXType);
+    atts.alignXType = pointAlign(story.getParagraphAtts(piece.start).alignXType);
     sb.setParagraphAtts(atts);
-    return ArtTextNodeDefinition.createFromStoryBuilder(anchor, sb);
+    return ArtTextNodeDefinition.createFromStoryBuilder({ x: piece.x, y: piece.y }, sb);
 }
 
 // ============================================================
@@ -301,12 +281,8 @@ function paragraphsOf(doc, node) {
     const undos = { count: 0 };
     let placed = null;
     try {
-        if (node.isFrameTextNode) {
-            if (isThreaded(node) || isOverflowing(node)) return null;
-            placed = scanLines(doc, node, true, undos);
-        } else {
-            placed = scanLines(doc, node, false, undos);
-        }
+        if (node.isFrameTextNode && (isThreaded(node) || isOverflowing(node))) return null;
+        placed = scanParagraphs(doc, node, undos);
     } finally {
         for (let i = 0; i < undos.count; i++) doc.undo();
     }
@@ -328,8 +304,9 @@ function buildCommand(doc, roots) {
     const addBuilder = AddChildNodesCommandBuilder.create(doc);
     let pieceCount = 0;
     for (const r of results) {
-        for (const p of r.placed) {
-            addBuilder.addNode(buildParagraphDefinition(r.node, p, { x: p.x, y: p.y }), r.node.parent, NodeMoveType.After, NodeChildType.Main);
+        const build = r.node.isFrameTextNode ? buildFramePieceDefinition : buildPointPieceDefinition;
+        for (const piece of r.placed) {
+            addBuilder.addNode(build(r.node, piece), r.node.parent, NodeMoveType.After, NodeChildType.Main);
             pieceCount++;
         }
     }
