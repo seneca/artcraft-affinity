@@ -70,7 +70,7 @@ Description:    Approximate port of VectorCraft's Type Tools > Text Tweaker. Giv
                  actually tested. Test the dialog for real before relying on it.
 
 Author:         Les Pruszynski (Middledot)
-Version:        1.2.0
+Version:        1.2.1
 Created:        05/11/2026
 Last updated:   05/11/2026
 Compatibility:  Affinity by Canva 3.3
@@ -191,8 +191,11 @@ function buildDialog(Dialog, UnitType, defaults) {
 
     const attributeIndex = Math.max(0, ATTRIBUTE_KEYS.indexOf(defaults.attribute));
     dlg.attributeBox = grp.addComboBox('Attribute', ATTRIBUTE_LABELS, attributeIndex);
-    dlg.fromEditor = grp.addUnitValueEditor('From', UnitType.Number, UnitType.Number, defaults.from).setShowPopupSlider(true);
-    dlg.toEditor = grp.addUnitValueEditor('To', UnitType.Number, UnitType.Number, defaults.to).setShowPopupSlider(true);
+    // No popup slider: confirmed directly by the user that dragging one doesn't fire the live-
+    // preview handler at all, even though typing a value does - a plain editor is used here so
+    // the live preview actually works, at the cost of the slider's drag affordance.
+    dlg.fromEditor = grp.addUnitValueEditor('From', UnitType.Number, UnitType.Number, defaults.from);
+    dlg.toEditor = grp.addUnitValueEditor('To', UnitType.Number, UnitType.Number, defaults.to);
     const shapeIndex = Math.max(0, SHAPE_KEYS.indexOf(defaults.shape));
     dlg.shapeBox = grp.addComboBox('Shape', SHAPE_LABELS, shapeIndex);
     dlg.seedEditor = grp.addUnitValueEditor('Random seed (Shape = Random only)', UnitType.Number, UnitType.Number, defaults.seed);

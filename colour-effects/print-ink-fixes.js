@@ -73,7 +73,7 @@ Description:    Port of VectorCraft's Colour Effects > Print Ink Fixes. Prepares
                  on it.
 
 Author:         Les Pruszynski (Middledot)
-Version:        1.2.0
+Version:        1.2.1
 Created:        05/11/2026
 Last updated:   05/11/2026
 Compatibility:  Affinity by Canva 3.3
@@ -145,10 +145,13 @@ function buildDialog(Dialog, UnitType, defaults) {
 
     const scopeIndex = Math.max(0, SCOPE_KEYS.indexOf(defaults.scope));
     dlg.scopeBox = grp.addComboBox('Scope', SCOPE_LABELS, scopeIndex);
-    dlg.inkLimitEditor = grp.addUnitValueEditor('Ink limit, % (0 = off)', UnitType.Percentage, UnitType.Percentage, defaults.inkLimitPercent, 0, 400).setShowPopupSlider(true);
+    // No popup slider: confirmed directly by the user that dragging one doesn't fire the live-
+    // preview handler at all, even though typing a value does - plain editors are used here so
+    // the live preview actually works, at the cost of the slider's drag affordance.
+    dlg.inkLimitEditor = grp.addUnitValueEditor('Ink limit, % (0 = off)', UnitType.Percentage, UnitType.Percentage, defaults.inkLimitPercent, 0, 400);
     dlg.excludePureBlackBox = grp.addCheckBox('Leave pure blacks/greys at full ink', defaults.excludePureBlack);
     dlg.removeWhiteOverprintBox = grp.addCheckBox('Turn off overprint on white', defaults.removeWhiteOverprint);
-    dlg.overprintBlackEditor = grp.addUnitValueEditor('Turn on overprint at this black ink %, (0 = off)', UnitType.Percentage, UnitType.Percentage, defaults.overprintBlackPercent, 0, 100).setShowPopupSlider(true);
+    dlg.overprintBlackEditor = grp.addUnitValueEditor('Turn on overprint at this black ink %, (0 = off)', UnitType.Percentage, UnitType.Percentage, defaults.overprintBlackPercent, 0, 100);
     dlg.textOnlyBox = grp.addCheckBox('Limit the overprint-black fix to text only', defaults.textOnly);
     dlg.fillBox = grp.addCheckBox('Fix fill colours', defaults.fill);
     dlg.strokeBox = grp.addCheckBox('Fix stroke colours', defaults.stroke);

@@ -105,6 +105,9 @@ at once, across everything you choose.
 
 ## Changelog
 
+1.2.1 - The ink-limit/overprint-black fields have no popup slider -
+confirmed directly (by the user, live) that dragging one didn't trigger
+the live preview, even though typing a value does.
 1.2.0 - The dialog now live-previews every fix on the real artwork as you
 change any setting, instead of only applying it after clicking OK.
 1.1.0 - Replaced the CONFIG-only workflow with a settings dialog (opens

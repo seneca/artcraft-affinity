@@ -57,7 +57,7 @@ Description:    Approximate port of VectorCraft's Artwork Cleanup > Join Point T
                  live - test it for real before relying on it.
 
 Author:         Les Pruszynski (Middledot)
-Version:        1.2.0
+Version:        1.2.1
 Created:        04/11/2026
 Last updated:   05/11/2026
 Compatibility:  Affinity by Canva 3.3
@@ -276,10 +276,13 @@ function main() {
     const dlg = Dialog.create('Join Point Text');
     const col = dlg.addColumn();
     const grp = col.addGroup('Settings');
+    // No popup slider: confirmed directly by the user that dragging one doesn't fire the live-
+    // preview handler at all, even though typing a value does - a plain editor is used here so
+    // the live preview actually works, at the cost of the slider's drag affordance.
     const sameLineEditor = grp.addUnitValueEditor(
         'Same-line tolerance (fraction of line height)', UnitType.Number, UnitType.Number,
         CONFIG.SAME_LINE_FRACTION, 0, 2
-    ).setShowPopupSlider(true);
+    );
 
     // Confirmed directly via this project's own test tool: an add-one-node-plus-delete-pieces
     // compound (what buildCommand builds) reverts cleanly from a preview, the same as a plain

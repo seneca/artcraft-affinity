@@ -58,21 +58,23 @@ Description:    Approximate port of VectorCraft's Colour Effects > Vector Halfto
                  CONFIG object you edit by hand - CONFIG below only supplies the values the dialog
                  opens with. Confirmed directly via this project's own test tool: an add-nodes-
                  plus-delete-original compound (what this script builds) reverts cleanly from a
-                 preview, same as a plain add, so it's safe to live-preview. But the render-and-
-                 sample pass itself is too expensive to run on every tick of a slider drag (it can
-                 mean thousands of cells, each sampled from a freshly rendered bitmap), so the full
-                 preview only runs on a committed change (a slider release, or any discrete control
-                 - combo boxes and checkboxes only ever report committed changes, never a drag);
-                 while a slider is actively moving, only a cheap grid-math dot-count estimate
-                 updates, via the dialog's own `transient` flag on each control-changed callback.
-                 Note for future maintenance: the dialog UI itself still can't be driven by this
-                 project's own MCP test tool (it only runs in the native Scripts panel), so its
-                 controls, wiring and the transient/committed split were checked carefully against
-                 /dialog.js and ts/ui.d.ts but not exercised live - test it for real before relying
-                 on it, in particular whether `transient` actually behaves as assumed here.
+                 preview, same as a plain add, so it's safe to live-preview. The render-and-sample
+                 pass itself is too expensive to want on every tick of a slider drag (it can mean
+                 thousands of cells, each sampled from a freshly rendered bitmap) - the original
+                 design used a `transient`-flag-based split (a cheap grid-math estimate while
+                 dragging, the full preview on release) to cope with that, but Frequency/Angle's
+                 popup sliders were removed entirely after the user confirmed, live, that dragging
+                 one didn't trigger a live preview at all, even though typing a value does; the
+                 transient-based cheap/expensive split in the code below is dead weight now (no
+                 slider means no drag to throttle) but harmless, and is left in case a future SDK
+                 change makes sliders behave as originally assumed. Note for future maintenance:
+                 the dialog UI itself still can't be driven by this project's own MCP test tool (it
+                 only runs in the native Scripts panel), so its controls and wiring were checked
+                 carefully against /dialog.js and ts/ui.d.ts but not exercised live - test it for
+                 real before relying on it.
 
 Author:         Les Pruszynski (Middledot)
-Version:        1.2.0
+Version:        1.2.1
 Created:        05/11/2026
 Last updated:   05/11/2026
 Compatibility:  Affinity by Canva 3.3
@@ -175,8 +177,14 @@ function buildDialog(Dialog, UnitType, defaults) {
 
     const shapeIndex = Math.max(0, SHAPE_KEYS.indexOf(defaults.shape));
     dlg.shapeBox = grp.addComboBox('Dot shape', SHAPE_LABELS, shapeIndex);
-    dlg.frequencyEditor = grp.addUnitValueEditor('Frequency (lines per inch)', UnitType.Number, UnitType.Number, defaults.frequency, 1, 300).setShowPopupSlider(true);
-    dlg.angleEditor = grp.addUnitValueEditor('Angle (degrees)', UnitType.Degree, UnitType.Degree, defaults.angleDeg).setShowPopupSlider(true);
+    // No popup slider: confirmed directly by the user that dragging one doesn't fire the live-
+    // preview handler at all, even though typing a value does - plain editors are used here so
+    // the live preview actually works, at the cost of the slider's drag affordance. Without a
+    // slider to drag, every change is really a discrete, committed edit - the transient-based
+    // throttling below still applies in case that ever isn't true, but in practice every change
+    // now likely runs the full (expensive) preview rather than the cheap estimate.
+    dlg.frequencyEditor = grp.addUnitValueEditor('Frequency (lines per inch)', UnitType.Number, UnitType.Number, defaults.frequency, 1, 300);
+    dlg.angleEditor = grp.addUnitValueEditor('Angle (degrees)', UnitType.Degree, UnitType.Degree, defaults.angleDeg);
     const modeIndex = Math.max(0, MODE_KEYS.indexOf(defaults.mode));
     dlg.modeBox = grp.addComboBox('Mode', MODE_LABELS, modeIndex);
     dlg.colorPicker = grp.addColourPicker('Dot colour (Mono mode only, ignored if "from art" is on)', defaults.color);
