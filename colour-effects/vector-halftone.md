@@ -10,6 +10,8 @@ own tone, as one undo step.
    **Run** - or, to keep it around, click **Save As...** to save it to the
    Script Library (**Window > Scripting > Script Library**), then click it
    there to run it any time.
+3. A dialog opens for the settings below - change what you want and click
+   **OK**, or **Cancel** to back out without changing anything.
 
 ## Purpose
 
@@ -44,24 +46,26 @@ is in each cell of a grid turned by your chosen screen angle.
 
 - **Real vector output** — dots are actual editable paths, not a raster
   effect
-- **No dialog** — set `CONFIG` once, then just run it
+- **A settings dialog** — opens pre-filled with `CONFIG`'s values, so you
+  can either edit `CONFIG` for new defaults or just change things in the
+  dialog each time
 - **Genuine colour-managed CMYK separation** in `"cmyk"` mode, not a naive
   conversion
 - **Five dot shapes** — circle, ellipse, square, diamond, line
-- **`CONFIG.FROM_ART`** — each dot in the art's own colour underneath it
+- **"Take each dot's colour from the art underneath"** — Mono mode only
 - **Single undo step**
 
 ## Usage tips
 
-- `CONFIG.FREQUENCY` is lines per inch, the same units a halftone screen is
+- **Frequency** is lines per inch, the same units a halftone screen is
   always described in - lower numbers mean bigger, coarser dots.
 - A frequency that's too fine for a large object is refused outright
   ("Too many dots for this size") rather than left to grind - lower it, or
   work on a smaller selection.
-- `CONFIG.ANGLE` is the mono screen's angle, or the black screen's in
-  `"cmyk"` mode - cyan, magenta and yellow sit at their own classic offsets
-  from it automatically.
-- Set `CONFIG.KEEP_ORIGINAL` to `true` the first time you try a new setting
+- **Angle** is the mono screen's angle, or the black screen's in CMYK mode -
+  cyan, magenta and yellow sit at their own classic offsets from it
+  automatically.
+- Turn on **Keep the original object** the first time you try a new setting
   on something, so you can compare the dots against the original before
   deciding to replace it.
 
@@ -85,7 +89,15 @@ is in each cell of a grid turned by your chosen screen angle.
   else in the selection - there's no separate "image couldn't be decoded"
   warning the way VectorCraft's own tool gives; a render that comes out
   blank there would still just sample as blank here.
+- **The dialog couldn't be tested the way this project's other scripts
+  are** - Affinity's scripting SDK's dialogs only run in the native
+  Scripts panel, not through this project's own MCP-based test tool, so
+  this one was checked carefully against the SDK's own source rather than
+  run live before shipping. Flag it if it misbehaves.
 
 ## Changelog
 
+1.1.0 - Replaced the CONFIG-only workflow with a settings dialog (opens
+pre-filled from CONFIG's values); CONFIG now only sets the dialog's
+defaults.
 1.0.0 - Initial version.

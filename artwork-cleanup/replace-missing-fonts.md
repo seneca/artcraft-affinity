@@ -11,6 +11,9 @@ available, and replaces it with a font you choose, as one undo step.
    press **Run** — or, to keep it around, click **Save As...** to save it
    to the Script Library (**Window > Scripting > Script Library**), then
    click it there to run it any time.
+3. A small dialog opens asking for the replacement font's family name -
+   type it and click **OK**, or **Cancel** to back out without changing
+   anything.
 
 ## Purpose
 
@@ -30,9 +33,10 @@ walks into.
 
 ## How it works
 
-1. Looks up `CONFIG.REPLACEMENT_FONT` (a font family name) among the fonts
+1. Asks for a replacement font family name in a small dialog (pre-filled
+   with `CONFIG.REPLACEMENT_FONT`), then looks it up among the fonts
    actually installed on your system. If it isn't there, stops and tells
-   you to edit that setting to a font that is.
+   you to run it again with a family name that is.
 2. Walks every page of the document, into every group and nested object,
    looking for anything with its own text.
 3. For each one, checks every run of its text (a run is a stretch of
@@ -49,7 +53,8 @@ walks into.
 
 ## Features
 
-- **No dialog, no selection needed** — just run it
+- **A one-field dialog** — no selection needed, just the replacement font's
+  family name, pre-filled from `CONFIG.REPLACEMENT_FONT`
 - **Keeps bold/italic styling** — a run's closest matching style in the
   replacement family is used, not always its plain Regular
 - **Checks the whole document**, every page, not just what's in front of
@@ -59,12 +64,13 @@ walks into.
 
 ## Usage tips
 
-- `CONFIG.REPLACEMENT_FONT` at the top of the script is the only setting -
-  it defaults to **Arial**, chosen for being close to universally
-  available on both macOS and Windows. Change it to any family name
-  `FontFamily.all` reports (open the Script Editor's console and run
-  `require('/fonts.js').FontFamily.all.map(f => f.name)` to see them all)
-  if you'd rather replace with something else.
+- The dialog's field defaults to **Arial**, chosen for being close to
+  universally available on both macOS and Windows - type any family name
+  `FontFamily.all` reports instead (open the Script Editor's console and
+  run `require('/fonts.js').FontFamily.all.map(f => f.name)` to see them
+  all) if you'd rather replace with something else. Edit
+  `CONFIG.REPLACEMENT_FONT` at the top of the script if you want a
+  different default to open with.
 - Running it when nothing is actually missing just tells you so - it's
   safe to run as a check.
 
@@ -75,9 +81,17 @@ walks into.
   gets the same replacement family, just in its own closest-matching
   style. If your document is missing two different fonts and you want
   them replaced with two different families, this can't tell them apart
-  in a single run - it fixes everything missing with whatever
-  `CONFIG.REPLACEMENT_FONT` is set to.
+  in a single run - it fixes everything missing with whatever family name
+  you typed into the dialog.
+- **The dialog couldn't be tested the way this project's other scripts
+  are** - Affinity's scripting SDK's dialogs only run in the native
+  Scripts panel, not through this project's own MCP-based test tool, so
+  this one was checked carefully against the SDK's own source rather than
+  run live before shipping. Flag it if it misbehaves.
 
 ## Changelog
 
+1.1.0 - Replaced the CONFIG-only workflow with a one-field settings dialog
+(opens pre-filled from CONFIG.REPLACEMENT_FONT); CONFIG now only sets the
+dialog's default.
 1.0.0 - Initial version.

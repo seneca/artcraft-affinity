@@ -12,6 +12,8 @@ live and fully editable afterward.
    **Run** - or, to keep it around, click **Save As...** to save it to the
    Script Library (**Window > Scripting > Script Library**), then click it
    there to run it any time.
+3. A dialog opens for the settings below - change what you want and click
+   **OK**, or **Cancel** to back out without changing anything.
 
 ## Purpose
 
@@ -41,7 +43,9 @@ that could come undone.
 
 ## Features
 
-- **No dialog** — set `CONFIG` once, then just run it
+- **A settings dialog** — opens pre-filled with `CONFIG`'s values, so you
+  can either edit `CONFIG` for new defaults or just change things in the
+  dialog each time
 - **The text stays completely live** — select it, retype it, restyle it
   afterward like anything else
 - **Five shapes** — straight, ease, bow, spike, random
@@ -54,10 +58,14 @@ that could come undone.
 - Click into the text with the Type tool and select just the letters you
   want tweaked before running it, if you don't want the whole object - the
   object your cursor is in counts as selected, the same as this project's
-  other live-cursor scripts.
-- `CONFIG.ATTRIBUTE`'s units match VectorCraft's own: `hScale`/`vScale` are
-  percent (100 = unchanged), `tracking` is 1/1000 em (VectorCraft's own
-  unit, matching Illustrator's), everything else is in points.
+  other live-cursor scripts. Do this *before* running the script - the
+  target text is locked in before the dialog opens.
+- The dialog's **Attribute** units match VectorCraft's own: Horizontal/
+  Vertical scale are percent (100 = unchanged), Tracking is 1/1000 em
+  (VectorCraft's own unit, matching Illustrator's), everything else is in
+  points. The dialog's From/To fields are plain numbers - they don't
+  relabel themselves per attribute, so keep the chosen attribute's units
+  in mind when typing a value.
 - `"bow"` and `"spike"` both rise from `CONFIG.FROM` at both ends to
   `CONFIG.TO` in the middle - `"bow"` smoothly, `"spike"` as a sharp
   triangular peak. `"ease"` runs start-to-end like `"straight"` but eases
@@ -89,11 +97,19 @@ that could come undone.
   one - VectorCraft's own tool addresses Unicode scalars directly; this
   addresses the same UTF-16 code-unit positions Affinity's own SDK uses
   for text ranges, which can split such a character across two of them.
-- **No dialog** means `CONFIG.ATTRIBUTE`'s per-attribute default
-  `CONFIG.FROM`/`CONFIG.TO` VectorCraft's own tool offers aren't built in
-  - set both explicitly for whichever attribute you pick (see Usage tips
-  for the units).
+- **The dialog doesn't switch From/To's default values per attribute** the
+  way VectorCraft's own tool does - whatever was last typed (or `CONFIG`'s
+  starting values) carries over when you switch Attribute, so re-check
+  From/To's units after changing it.
+- **The dialog couldn't be tested the way this project's other scripts
+  are** - Affinity's scripting SDK's dialogs only run in the native
+  Scripts panel, not through this project's own MCP-based test tool, so
+  this one was checked carefully against the SDK's own source rather than
+  run live before shipping. Flag it if it misbehaves.
 
 ## Changelog
 
+1.1.0 - Replaced the CONFIG-only workflow with a settings dialog (opens
+pre-filled from CONFIG's values); CONFIG now only sets the dialog's
+defaults.
 1.0.0 - Initial version.

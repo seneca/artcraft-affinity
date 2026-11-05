@@ -54,8 +54,16 @@ Description:    Approximate port of VectorCraft's Colour Effects > Vector Halfto
                  combined into a single multi-contour `PolyCurve`, turned into one real path
                  object via `PolyCurveNodeDefinition.create`.
 
+                 Settings come from a dialog (Affinity's own Dialog API, /dialog.js) rather than a
+                 CONFIG object you edit by hand - CONFIG below only supplies the values the dialog
+                 opens with. Note for future maintenance: dialogs can't be driven by this project's
+                 own MCP test tool (it only runs in the native Scripts panel), so the dialog's
+                 wiring was checked carefully against /dialog.js and ts/ui.d.ts but not exercised
+                 live the way every other part of this script was - test it for real before
+                 relying on it.
+
 Author:         Les Pruszynski (Middledot)
-Version:        1.0.0
+Version:        1.1.0
 Created:        05/11/2026
 Last updated:   05/11/2026
 Compatibility:  Affinity by Canva 3.3
@@ -73,6 +81,8 @@ Contact:        lpruszynski@middledot.com
 // CONFIGURATION
 // ============================================================
 
+// These are only the values the dialog opens with - change them if you want different starting
+// defaults, but everything here can also be changed in the dialog each time the script runs.
 const CONFIG = {
     // "circle" | "ellipse" | "square" | "diamond" | "line".
     SHAPE: 'circle',
@@ -134,6 +144,53 @@ function parseHexColor(hex) {
     if (!m) return RGBA8(0, 0, 0);
     const n = parseInt(m[1], 16);
     return RGBA8((n >> 16) & 255, (n >> 8) & 255, n & 255);
+}
+
+// ============================================================
+// DIALOG
+// ============================================================
+
+const SHAPE_KEYS = ['circle', 'ellipse', 'square', 'diamond', 'line'];
+const SHAPE_LABELS = ['Circle', 'Ellipse', 'Square', 'Diamond', 'Line'];
+const MODE_KEYS = ['mono', 'cmyk'];
+const MODE_LABELS = ['Mono (one screen)', 'CMYK (four screens)'];
+
+// Shows the settings dialog pre-filled from `defaults`. Returns the chosen settings, or null if
+// the dialog was cancelled.
+//
+// Modules that clear the live selection when require()'d (/dialog among them) are loaded lazily,
+// after the selection is captured - see modern-js.md 2.1 in the affinity-scripts-toolkit.
+function showDialog(defaults) {
+    const { Dialog, DialogResult } = require('/dialog.js');
+    const { UnitType } = require('/units.js');
+
+    const dialog = Dialog.create('Vector Halftone');
+    const col = dialog.addColumn();
+    const grp = col.addGroup('Settings');
+
+    const shapeIndex = Math.max(0, SHAPE_KEYS.indexOf(defaults.shape));
+    const shapeBox = grp.addComboBox('Dot shape', SHAPE_LABELS, shapeIndex);
+    const frequencyEditor = grp.addUnitValueEditor('Frequency (lines per inch)', UnitType.Number, UnitType.Number, defaults.frequency, 1, 300);
+    const angleEditor = grp.addUnitValueEditor('Angle (degrees)', UnitType.Degree, UnitType.Degree, defaults.angleDeg);
+    const modeIndex = Math.max(0, MODE_KEYS.indexOf(defaults.mode));
+    const modeBox = grp.addComboBox('Mode', MODE_LABELS, modeIndex);
+    const colorPicker = grp.addColourPicker('Dot colour (Mono mode only, ignored if "from art" is on)', defaults.color);
+    const fromArtBox = grp.addCheckBox('Mono mode: take each dot\'s colour from the art underneath', defaults.fromArt);
+    const invertBox = grp.addCheckBox('Invert (dots for light tones instead of dark)', defaults.invert);
+    const keepOriginalBox = grp.addCheckBox('Keep the original object', defaults.keepOriginal);
+
+    if (dialog.runModal() !== DialogResult.Ok) return null;
+
+    return {
+        shape: SHAPE_KEYS[shapeBox.selectedIndex],
+        frequency: frequencyEditor.value,
+        angleDeg: angleEditor.value,
+        mode: MODE_KEYS[modeBox.selectedIndex],
+        color: colorPicker.value || defaults.color,
+        fromArt: fromArtBox.value,
+        invert: invertBox.value,
+        keepOriginal: keepOriginalBox.value,
+    };
 }
 
 // ============================================================
@@ -342,14 +399,26 @@ function main() {
     }
     const node = selected[0];
 
-    const shape = ['circle', 'ellipse', 'square', 'diamond', 'line'].includes(CONFIG.SHAPE) ? CONFIG.SHAPE : 'circle';
-    const frequency = clamp(Number(CONFIG.FREQUENCY) || 20, 1, 300);
+    const cfg = showDialog({
+        shape: SHAPE_KEYS.includes(CONFIG.SHAPE) ? CONFIG.SHAPE : SHAPE_KEYS[0],
+        frequency: clamp(Number(CONFIG.FREQUENCY) || 20, 1, 300),
+        angleDeg: isFinite(CONFIG.ANGLE) ? Number(CONFIG.ANGLE) : 45,
+        mode: MODE_KEYS.includes(CONFIG.MODE) ? CONFIG.MODE : MODE_KEYS[0],
+        color: parseHexColor(CONFIG.COLOR),
+        fromArt: !!CONFIG.FROM_ART,
+        invert: !!CONFIG.INVERT,
+        keepOriginal: !!CONFIG.KEEP_ORIGINAL,
+    });
+    if (!cfg) return;
+
+    const shape = cfg.shape;
+    const frequency = clamp(cfg.frequency, 1, 300);
     const cell = 72 / frequency;
-    const angleDeg = isFinite(CONFIG.ANGLE) ? Number(CONFIG.ANGLE) : 45;
-    const mono = CONFIG.MODE !== 'cmyk';
-    const invert = !!CONFIG.INVERT;
-    const fromArt = mono && !!CONFIG.FROM_ART;
-    const monoColor = parseHexColor(CONFIG.COLOR);
+    const angleDeg = cfg.angleDeg;
+    const mono = cfg.mode !== 'cmyk';
+    const invert = cfg.invert;
+    const fromArt = mono && cfg.fromArt;
+    const monoColor = cfg.color;
 
     const bounds = node.getExactSpreadVisibleBox(true, false);
     if (!(bounds.width > 0 && bounds.height > 0)) {
@@ -358,7 +427,7 @@ function main() {
     }
     const plan = planSampling(bounds, cell);
     if (!plan) {
-        alert('Too many dots for this size - lower CONFIG.FREQUENCY.');
+        alert('Too many dots for this size - lower the frequency and try again.');
         return;
     }
 
@@ -399,8 +468,8 @@ function main() {
     reader.dispose();
 
     if (totalDots === 0) {
-        alert('No dots - the tone is below the minimum everywhere. Try turning CONFIG.INVERT ' +
-            'on, or check CONFIG.COLOR and CONFIG.MODE.');
+        alert('No dots - the tone is below the minimum everywhere. Try turning Invert on, or ' +
+            'check the dot colour and mode.');
         return;
     }
 
@@ -414,7 +483,7 @@ function main() {
 
     const compound = CompoundCommandBuilder.create();
     compound.addCommand(addCmd);
-    if (!CONFIG.KEEP_ORIGINAL) {
+    if (!cfg.keepOriginal) {
         compound.addCommand(DocumentCommand.createDeleteSelection(Selection.create(doc, [node])));
     }
     const compoundCmd = compound.createCommand();

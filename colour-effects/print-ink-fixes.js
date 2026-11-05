@@ -60,8 +60,16 @@ Description:    Port of VectorCraft's Colour Effects > Print Ink Fixes. Prepares
                  colour read and written through GlyphAtts.brushFill/penFill and StoryDelta, the
                  same mechanism replace-missing-fonts.js uses for a run's font.
 
+                 Settings come from a dialog (Affinity's own Dialog API, /dialog.js) rather than a
+                 CONFIG object you edit by hand - CONFIG below only supplies the values the dialog
+                 opens with. Note for future maintenance: dialogs can't be driven by this project's
+                 own MCP test tool (it only runs in the native Scripts panel), so the dialog's
+                 wiring was checked carefully against /dialog.js and ts/ui.d.ts but not exercised
+                 live the way every other part of this script was - test it for real before
+                 relying on it.
+
 Author:         Les Pruszynski (Middledot)
-Version:        1.0.0
+Version:        1.1.0
 Created:        05/11/2026
 Last updated:   05/11/2026
 Compatibility:  Affinity by Canva 3.3
@@ -78,6 +86,8 @@ Contact:        lpruszynski@middledot.com
 // CONFIGURATION
 // ============================================================
 
+// These are only the values the dialog opens with - change them if you want different starting
+// defaults, but everything here can also be changed in the dialog each time the script runs.
 const CONFIG = {
     // Which objects to fix: 'auto' (the selection if anything is selected, else the whole
     // document), 'document' (always every page) or 'selection' (always just the selection).
@@ -112,6 +122,50 @@ const { Selection, TextSelection } = require('/selections.js');
 const { CMYKAf, Gradient, ColourStop } = require('/colours.js');
 const { SolidFill } = require('/fills.js');
 const { StoryDelta } = require('/storydelta.js');
+
+// ============================================================
+// DIALOG
+// ============================================================
+
+const SCOPE_KEYS = ['auto', 'document', 'selection'];
+const SCOPE_LABELS = ['Automatic (selection if any, else whole document)', 'Whole document', 'Selection only'];
+
+// Shows the settings dialog pre-filled from `defaults`. Returns the chosen settings, or null if
+// the dialog was cancelled.
+//
+// Modules that clear the live selection when require()'d (/dialog among them) are loaded lazily,
+// after the selection is captured - see modern-js.md 2.1 in the affinity-scripts-toolkit.
+function showDialog(defaults) {
+    const { Dialog, DialogResult } = require('/dialog.js');
+    const { UnitType } = require('/units.js');
+
+    const dialog = Dialog.create('Print Ink Fixes');
+    const col = dialog.addColumn();
+    const grp = col.addGroup('Settings');
+
+    const scopeIndex = Math.max(0, SCOPE_KEYS.indexOf(defaults.scope));
+    const scopeBox = grp.addComboBox('Scope', SCOPE_LABELS, scopeIndex);
+    const inkLimitEditor = grp.addUnitValueEditor('Ink limit, % (0 = off)', UnitType.Percentage, UnitType.Percentage, defaults.inkLimitPercent, 0, 400);
+    const excludePureBlackBox = grp.addCheckBox('Leave pure blacks/greys at full ink', defaults.excludePureBlack);
+    const removeWhiteOverprintBox = grp.addCheckBox('Turn off overprint on white', defaults.removeWhiteOverprint);
+    const overprintBlackEditor = grp.addUnitValueEditor('Turn on overprint at this black ink %, (0 = off)', UnitType.Percentage, UnitType.Percentage, defaults.overprintBlackPercent, 0, 100);
+    const textOnlyBox = grp.addCheckBox('Limit the overprint-black fix to text only', defaults.textOnly);
+    const fillBox = grp.addCheckBox('Fix fill colours', defaults.fill);
+    const strokeBox = grp.addCheckBox('Fix stroke colours', defaults.stroke);
+
+    if (dialog.runModal() !== DialogResult.Ok) return null;
+
+    return {
+        scope: SCOPE_KEYS[scopeBox.selectedIndex],
+        inkLimit: inkLimitEditor.value / 100,
+        excludePureBlack: excludePureBlackBox.value,
+        removeWhiteOverprint: removeWhiteOverprintBox.value,
+        overprintBlack: overprintBlackEditor.value / 100,
+        textOnly: textOnlyBox.value,
+        fill: fillBox.value,
+        stroke: strokeBox.value,
+    };
+}
 
 // ============================================================
 // COLOUR MATH
@@ -315,13 +369,13 @@ function collectNodes(roots) {
 }
 
 // The roots to search: the selection, or the whole document while nothing is selected - the same
-// default VectorCraft's own tool uses - unless CONFIG.SCOPE forces one or the other.
-function resolveRoots(doc, cfg) {
-    const selected = doc.selection.nodes.toArray();
+// default VectorCraft's own tool uses - unless CONFIG.SCOPE forces one or the other. `selected`
+// must be captured before showDialog() is called - see that function's own comment on why.
+function resolveRoots(doc, cfg, selected) {
     const scope = cfg.scope === 'auto' ? (selected.length > 0 ? 'selection' : 'document') : cfg.scope;
     if (scope === 'selection') {
         if (selected.length === 0) {
-            alert('Nothing is selected - select some objects first, or set CONFIG.SCOPE to "document".');
+            alert('Nothing is selected - select some objects first, or choose "Whole document" in the dialog.');
             return null;
         }
         return selected;
@@ -343,24 +397,27 @@ function main() {
         return;
     }
 
-    const cfg = {
-        scope: CONFIG.SCOPE,
-        inkLimit: CONFIG.INK_LIMIT / 100,
-        excludePureBlack: CONFIG.EXCLUDE_PURE_BLACK,
-        removeWhiteOverprint: CONFIG.REMOVE_WHITE_OVERPRINT,
-        overprintBlack: CONFIG.OVERPRINT_BLACK / 100,
-        textOnly: CONFIG.TEXT_ONLY,
-        fill: CONFIG.FILL,
-        stroke: CONFIG.STROKE,
-    };
+    const selected = doc.selection.nodes.toArray();
+
+    const cfg = showDialog({
+        scope: SCOPE_KEYS.includes(CONFIG.SCOPE) ? CONFIG.SCOPE : SCOPE_KEYS[0],
+        inkLimitPercent: isFinite(Number(CONFIG.INK_LIMIT)) ? Number(CONFIG.INK_LIMIT) : 0,
+        excludePureBlack: CONFIG.EXCLUDE_PURE_BLACK !== false,
+        removeWhiteOverprint: !!CONFIG.REMOVE_WHITE_OVERPRINT,
+        overprintBlackPercent: isFinite(Number(CONFIG.OVERPRINT_BLACK)) ? Number(CONFIG.OVERPRINT_BLACK) : 0,
+        textOnly: !!CONFIG.TEXT_ONLY,
+        fill: CONFIG.FILL !== false,
+        stroke: CONFIG.STROKE !== false,
+    });
+    if (!cfg) return;
 
     if (cfg.inkLimit <= 0 && cfg.overprintBlack <= 0 && !cfg.removeWhiteOverprint) {
-        alert('Nothing to do - set CONFIG.INK_LIMIT, CONFIG.OVERPRINT_BLACK or ' +
-            'CONFIG.REMOVE_WHITE_OVERPRINT at the top of the script.');
+        alert('Nothing to do - the ink limit and overprint-black percentage were both left at 0, ' +
+            'and "Turn off overprint on white" was left unchecked.');
         return;
     }
 
-    const roots = resolveRoots(doc, cfg);
+    const roots = resolveRoots(doc, cfg, selected);
     if (!roots) return;
 
     const nodes = collectNodes(roots);

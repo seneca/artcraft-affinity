@@ -10,6 +10,8 @@ painted somewhere in `CONFIG.SCOPE`, as one undo step.
    press **Run** - or, to keep it around, click **Save As...** to save it
    to the Script Library (**Window > Scripting > Script Library**), then
    click it there to run it any time.
+3. A dialog opens for the settings below - change what you want and click
+   **OK**, or **Cancel** to back out without changing anything.
 
 ## Purpose
 
@@ -38,7 +40,9 @@ with its own values, since there's no swatch name to show.
 
 ## Features
 
-- **No dialog** — set `CONFIG` once, then just run it
+- **A settings dialog** — opens pre-filled with `CONFIG`'s values, so you
+  can either edit `CONFIG` for new defaults or just change things in the
+  dialog each time
 - **Checks fills, strokes and character-level text colour**, the same
   reach `print-ink-fixes.js` has
 - **Chips are already the right colour the moment they're created** - no
@@ -72,7 +76,15 @@ with its own values, since there's no swatch name to show.
   own tool leaving them out of its own legend.
 - **Gradient meshes aren't looked at** - only a solid colour or a plain
   gradient's stops.
+- **The dialog couldn't be tested the way this project's other scripts
+  are** - Affinity's scripting SDK's dialogs only run in the native
+  Scripts panel, not through this project's own MCP-based test tool, so
+  this one was checked carefully against the SDK's own source rather than
+  run live before shipping. Flag it if it misbehaves.
 
 ## Changelog
 
+1.1.0 - Replaced the CONFIG-only workflow with a settings dialog (opens
+pre-filled from CONFIG's values); CONFIG now only sets the dialog's
+defaults.
 1.0.0 - Initial version.

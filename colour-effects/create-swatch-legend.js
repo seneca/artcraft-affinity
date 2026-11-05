@@ -52,8 +52,16 @@ Description:    Adapted port of VectorCraft's Colour Effects > Create Swatch Leg
                  SDK's own makeGrid.js example leaves its own grid cells ungrouped); they're all
                  selected when it finishes, ready for Ctrl/Cmd+G if you want them bundled.
 
+                 Settings come from a dialog (Affinity's own Dialog API, /dialog.js) rather than a
+                 CONFIG object you edit by hand - CONFIG below only supplies the values the dialog
+                 opens with. Note for future maintenance: dialogs can't be driven by this project's
+                 own MCP test tool (it only runs in the native Scripts panel), so the dialog's
+                 wiring was checked carefully against /dialog.js and ts/ui.d.ts but not exercised
+                 live the way every other part of this script was - test it for real before
+                 relying on it.
+
 Author:         Les Pruszynski (Middledot)
-Version:        1.0.0
+Version:        1.1.0
 Created:        05/11/2026
 Last updated:   05/11/2026
 Compatibility:  Affinity by Canva 3.3
@@ -70,6 +78,8 @@ Contact:        lpruszynski@middledot.com
 // CONFIGURATION
 // ============================================================
 
+// These are only the values the dialog opens with - change them if you want different starting
+// defaults, but everything here can also be changed in the dialog each time the script runs.
 const CONFIG = {
     // Which colours to show: 'document' (every colour painted anywhere) or 'selection' (only
     // within the selected objects).
@@ -106,6 +116,55 @@ const { Rectangle } = require('/geometry.js');
 const { ShapeNodeDefinition, ArtTextNodeDefinition } = require('/nodes.js');
 const { ShapeRectangle } = require('/shapes.js');
 const { StoryBuilder } = require('/storybuilder.js');
+
+// ============================================================
+// DIALOG
+// ============================================================
+
+const SCOPE_KEYS = ['document', 'selection'];
+const SCOPE_LABELS = ['Whole document', 'Selection only'];
+
+// Shows the settings dialog pre-filled from `defaults`. Returns the chosen settings, or null if
+// the dialog was cancelled.
+//
+// Modules that clear the live selection when require()'d (/dialog among them) are loaded lazily,
+// after the selection is captured - see modern-js.md 2.1 in the affinity-scripts-toolkit.
+function showDialog(defaults) {
+    const { Dialog, DialogResult } = require('/dialog.js');
+    const { UnitType } = require('/units.js');
+
+    const dialog = Dialog.create('Create Swatch Legend');
+    const col = dialog.addColumn();
+    const grp = col.addGroup('Settings');
+
+    const scopeIndex = Math.max(0, SCOPE_KEYS.indexOf(defaults.scope));
+    const scopeBox = grp.addComboBox('Colours to show', SCOPE_LABELS, scopeIndex);
+    const fillBox = grp.addCheckBox('Include fill colours', defaults.fill);
+    const strokeBox = grp.addCheckBox('Include stroke colours', defaults.stroke);
+    const columnsEditor = grp.addUnitValueEditor('Columns', UnitType.Number, UnitType.Number, defaults.columns, 1, 50);
+    const chipSizeEditor = grp.addUnitValueEditor('Chip size (pt)', UnitType.Number, UnitType.Number, defaults.chipSize, 1, null);
+    const gapEditor = grp.addUnitValueEditor('Gap (pt)', UnitType.Number, UnitType.Number, defaults.gap, 0, null);
+    const showValuesBox = grp.addCheckBox('Label each chip with its colour values', defaults.showValues);
+    const labelSizeEditor = grp.addUnitValueEditor('Label size (pt)', UnitType.Number, UnitType.Number, defaults.labelSize, 1, null);
+    const autoPositionBox = grp.addCheckBox('Position automatically (inset from the corner)', defaults.autoPosition);
+    const xEditor = grp.addUnitValueEditor('X (if not automatic)', UnitType.Number, UnitType.Number, defaults.x);
+    const yEditor = grp.addUnitValueEditor('Y (if not automatic)', UnitType.Number, UnitType.Number, defaults.y);
+
+    if (dialog.runModal() !== DialogResult.Ok) return null;
+
+    return {
+        scope: SCOPE_KEYS[scopeBox.selectedIndex],
+        fill: fillBox.value,
+        stroke: strokeBox.value,
+        columns: columnsEditor.value,
+        chipSize: chipSizeEditor.value,
+        gap: gapEditor.value,
+        showValues: showValuesBox.value,
+        labelSize: labelSizeEditor.value,
+        x: autoPositionBox.value ? null : xEditor.value,
+        y: autoPositionBox.value ? null : yEditor.value,
+    };
+}
 
 // ============================================================
 // FINDING THE COLOURS
@@ -209,11 +268,11 @@ function buildChipDefinition(rect, colour) {
     return ShapeNodeDefinition.create(ShapeRectangle.create(), rect, colour);
 }
 
-function buildLabelDefinition(doc, text, x, y, textColour) {
+function buildLabelDefinition(doc, text, x, y, textColour, labelSize) {
     const sb = StoryBuilder.create();
     sb.setToArtisticTextDefaultStyle(doc.dpi, doc.rasterFormat);
     const atts = sb.glyphAtts.clone();
-    atts.height = CONFIG.LABEL_SIZE;
+    atts.height = labelSize;
     atts.brushFill = FillDescriptor.createSolid(textColour);
     sb.setGlyphAtts(atts);
     sb.addText(text);
@@ -229,24 +288,39 @@ function main() {
     if (!doc) { alert('This script requires an open document'); return; }
 
     const selected = doc.selection.nodes.toArray();
-    if (CONFIG.SCOPE === 'selection' && selected.length === 0) {
-        alert('Nothing is selected - select some objects first, or set CONFIG.SCOPE to "document".');
+
+    const cfg = showDialog({
+        scope: SCOPE_KEYS.includes(CONFIG.SCOPE) ? CONFIG.SCOPE : SCOPE_KEYS[0],
+        fill: CONFIG.FILL !== false,
+        stroke: CONFIG.STROKE !== false,
+        columns: Math.max(1, Math.round(Number(CONFIG.COLUMNS)) || 4),
+        chipSize: isFinite(Number(CONFIG.CHIP_SIZE)) ? Number(CONFIG.CHIP_SIZE) : 72,
+        gap: isFinite(Number(CONFIG.GAP)) ? Number(CONFIG.GAP) : 12,
+        showValues: CONFIG.SHOW_VALUES !== false,
+        labelSize: isFinite(Number(CONFIG.LABEL_SIZE)) ? Number(CONFIG.LABEL_SIZE) : 9,
+        autoPosition: CONFIG.X == null && CONFIG.Y == null,
+        x: CONFIG.X != null ? Number(CONFIG.X) : 0,
+        y: CONFIG.Y != null ? Number(CONFIG.Y) : 0,
+    });
+    if (!cfg) return;
+
+    if (cfg.scope === 'selection' && selected.length === 0) {
+        alert('Nothing is selected - select some objects first, or choose "Whole document" in the dialog.');
         return;
     }
 
-    const cfg = { fill: CONFIG.FILL, stroke: CONFIG.STROKE };
-    const roots = CONFIG.SCOPE === 'selection' ? selected : doc.spreads.toArray();
+    const roots = cfg.scope === 'selection' ? selected : doc.spreads.toArray();
     const colours = collectColours(roots, cfg).slice(0, MAX_CHIPS);
     if (colours.length === 0) {
         alert('No solid or gradient colours were found.');
         return;
     }
 
-    const cols = Math.max(1, Math.round(CONFIG.COLUMNS));
-    const size = CONFIG.CHIP_SIZE;
-    const gap = CONFIG.GAP;
-    const originX = CONFIG.X != null ? CONFIG.X : gap;
-    const originY = CONFIG.Y != null ? CONFIG.Y : gap;
+    const cols = Math.max(1, Math.round(cfg.columns));
+    const size = cfg.chipSize;
+    const gap = cfg.gap;
+    const originX = cfg.x != null ? cfg.x : gap;
+    const originY = cfg.y != null ? cfg.y : gap;
     const black = RGBA8(0, 0, 0);
     const white = RGBA8(255, 255, 255);
 
@@ -257,9 +331,9 @@ function main() {
         const x = originX + col * (size + gap);
         const y = originY + row * (size + gap);
         builder.addNode(buildChipDefinition(new Rectangle(x, y, size, size), colour));
-        if (CONFIG.SHOW_VALUES) {
+        if (cfg.showValues) {
             const textColour = labLightness(colour) > 50 ? black : white;
-            builder.addNode(buildLabelDefinition(doc, describeColour(colour), x + 4, y + size - 8, textColour));
+            builder.addNode(buildLabelDefinition(doc, describeColour(colour), x + 4, y + size - 8, textColour, cfg.labelSize));
         }
     });
 

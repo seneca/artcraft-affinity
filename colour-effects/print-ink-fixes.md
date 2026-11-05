@@ -12,6 +12,8 @@ is selected.
    **Run** - or, to keep it around, click **Save As...** to save it to the
    Script Library (**Window > Scripting > Script Library**), then click it
    there to run it any time.
+3. A dialog opens for the settings below - change what you want and click
+   **OK**, or **Cancel** to back out without changing anything.
 
 ## Purpose
 
@@ -51,7 +53,9 @@ at once, across everything you choose.
 
 ## Features
 
-- **No dialog** — set `CONFIG` once, then just run it
+- **A settings dialog** — opens pre-filled with `CONFIG`'s values, so you
+  can either edit `CONFIG` for new defaults or just change things in the
+  dialog each time
 - **Fixes fills, strokes and character-level text colour** in the same pass
 - **Keeps blend mode, transform and everything else about a fill exactly as
   it was** — only the colour itself (and its overprint flag) changes
@@ -61,16 +65,17 @@ at once, across everything you choose.
 
 ## Usage tips
 
-- All three fixes are off by default - set at least one of
-  `CONFIG.INK_LIMIT`, `CONFIG.OVERPRINT_BLACK` or
-  `CONFIG.REMOVE_WHITE_OVERPRINT` at the top of the script before running it.
-- `CONFIG.INK_LIMIT` is a percentage of combined C+M+Y+K, so 100 means "one
+- All three fixes are off by default - turn on at least one of **Ink
+  limit**, **Turn on overprint at this black ink %**, or **Turn off
+  overprint on white** in the dialog.
+- The ink limit is a percentage of combined C+M+Y+K, so 100 means "one
   full channel's worth," not "fully saturated in every channel" (which would
   be 400). A common press limit is 240-300.
-- `CONFIG.TEXT_ONLY` only narrows `CONFIG.OVERPRINT_BLACK` - it decides
-  whether a *shape's* own fill/stroke counts as eligible for it alongside
-  text. Ink limiting and white-overprint removal always apply everywhere
-  regardless of this setting, matching VectorCraft's own tool.
+- **Limit the overprint-black fix to text only** only narrows the
+  overprint-black fix - it decides whether a *shape's* own fill/stroke
+  counts as eligible for it alongside text. Ink limiting and white-overprint
+  removal always apply everywhere regardless of this setting, matching
+  VectorCraft's own tool.
 - Run it once with everything you want set, rather than multiple times with
   different settings - each run is its own separate undo step.
 
@@ -89,7 +94,15 @@ at once, across everything you choose.
   own tool leaving spot inks and Registration alone.
 - **Images and pattern fills aren't touched**, the same as VectorCraft's own
   tool.
+- **The dialog couldn't be tested the way this project's other scripts
+  are** - Affinity's scripting SDK's dialogs only run in the native
+  Scripts panel, not through this project's own MCP-based test tool, so
+  this one was checked carefully against the SDK's own source rather than
+  run live before shipping. Flag it if it misbehaves.
 
 ## Changelog
 
+1.1.0 - Replaced the CONFIG-only workflow with a settings dialog (opens
+pre-filled from CONFIG's values); CONFIG now only sets the dialog's
+defaults.
 1.0.0 - Initial version.

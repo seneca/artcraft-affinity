@@ -49,8 +49,16 @@ Description:    Adapted port of VectorCraft's Colour Effects > Find Nearest Swat
                  a/b are already signed, scaled 257 per standard a*/b* unit (divide by 257) -
                  calibrated against known sRGB primaries' published Lab values.
 
+                 Settings come from a dialog (Affinity's own Dialog API, /dialog.js) rather than a
+                 CONFIG object you edit by hand - CONFIG below only supplies the values the dialog
+                 opens with. Note for future maintenance: dialogs can't be driven by this project's
+                 own MCP test tool (it only runs in the native Scripts panel), so the dialog's
+                 wiring was checked carefully against /dialog.js and ts/ui.d.ts but not exercised
+                 live the way every other part of this script was - test it for real before
+                 relying on it.
+
 Author:         Les Pruszynski (Middledot)
-Version:        1.0.0
+Version:        1.1.0
 Created:        05/11/2026
 Last updated:   05/11/2026
 Compatibility:  Affinity by Canva 3.3
@@ -67,6 +75,8 @@ Contact:        lpruszynski@middledot.com
 // CONFIGURATION
 // ============================================================
 
+// These are only the values the dialog opens with - change them if you want different starting
+// defaults, but everything here can also be changed in the dialog each time the script runs.
 const CONFIG = {
     // Where to gather the candidate colours to match against: 'document' (every colour painted
     // anywhere in the document) or 'selection' (only within the selected objects).
@@ -81,6 +91,42 @@ const CONFIG = {
 };
 
 const { Document } = require('/document.js');
+
+// ============================================================
+// DIALOG
+// ============================================================
+
+const SCOPE_KEYS = ['document', 'selection'];
+const SCOPE_LABELS = ['Whole document', 'Selection only'];
+
+// Shows the settings dialog pre-filled from `defaults`. Returns the chosen settings, or null if
+// the dialog was cancelled.
+//
+// Modules that clear the live selection when require()'d (/dialog among them) are loaded lazily,
+// after the selection is captured - see modern-js.md 2.1 in the affinity-scripts-toolkit.
+function showDialog(defaults) {
+    const { Dialog, DialogResult } = require('/dialog.js');
+    const { UnitType } = require('/units.js');
+
+    const dialog = Dialog.create('Find Nearest Swatch');
+    const col = dialog.addColumn();
+    const grp = col.addGroup('Settings');
+
+    const scopeIndex = Math.max(0, SCOPE_KEYS.indexOf(defaults.paletteScope));
+    const scopeBox = grp.addComboBox('Match against', SCOPE_LABELS, scopeIndex);
+    const countEditor = grp.addUnitValueEditor('Matches to report', UnitType.Number, UnitType.Number, defaults.count, 1, 50);
+    const fillBox = grp.addCheckBox('Include fill colours', defaults.fill);
+    const strokeBox = grp.addCheckBox('Include stroke colours', defaults.stroke);
+
+    if (dialog.runModal() !== DialogResult.Ok) return null;
+
+    return {
+        paletteScope: SCOPE_KEYS[scopeBox.selectedIndex],
+        count: Math.round(countEditor.value),
+        fill: fillBox.value,
+        stroke: strokeBox.value,
+    };
+}
 
 // ============================================================
 // FINDING THE COLOURS
@@ -246,8 +292,13 @@ function main() {
         return;
     }
 
-    const cfg = { fill: CONFIG.FILL, stroke: CONFIG.STROKE };
-    const count = Math.max(1, Math.min(50, Math.round(CONFIG.COUNT) || 5));
+    const cfg = showDialog({
+        paletteScope: SCOPE_KEYS.includes(CONFIG.PALETTE_SCOPE) ? CONFIG.PALETTE_SCOPE : SCOPE_KEYS[0],
+        count: Math.max(1, Math.min(50, Math.round(Number(CONFIG.COUNT)) || 5)),
+        fill: CONFIG.FILL !== false,
+        stroke: CONFIG.STROKE !== false,
+    });
+    if (!cfg) return;
 
     const lookupColours = collectColours(selected, cfg);
     if (lookupColours.length === 0) {
@@ -255,11 +306,11 @@ function main() {
         return;
     }
 
-    const paletteRoots = CONFIG.PALETTE_SCOPE === 'selection' ? selected : doc.spreads.toArray();
+    const paletteRoots = cfg.paletteScope === 'selection' ? selected : doc.spreads.toArray();
     const paletteColours = collectColours(paletteRoots, cfg)
         .map(colour => ({ colour, lab: standardLab(colour) }));
     if (paletteColours.length === 0) {
-        alert('Nothing to match against - CONFIG.PALETTE_SCOPE finds no colours at all.');
+        alert('Nothing to match against - that scope finds no colours at all.');
         return;
     }
 
@@ -269,7 +320,7 @@ function main() {
         const matches = paletteColours
             .map(p => ({ colour: p.colour, deltaE: deltaE2000(lab, p.lab) }))
             .sort((a, b) => a.deltaE - b.deltaE)
-            .slice(0, count);
+            .slice(0, cfg.count);
         lines.push((i + 1) + '. ' + describeColour(colour));
         matches.forEach((m, j) => {
             lines.push('     ' + (j + 1) + '. ' + describeColour(m.colour) + '  ΔE ' + m.deltaE.toFixed(2));
@@ -280,7 +331,7 @@ function main() {
     console.log(report);
     alert(lookupColours.length + ' colour' + (lookupColours.length === 1 ? '' : 's') +
         ' in the selection, matched against ' + paletteColours.length + ' found in the ' +
-        CONFIG.PALETTE_SCOPE + ':\n\n' + report);
+        cfg.paletteScope + ':\n\n' + report);
 }
 
 try {

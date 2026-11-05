@@ -41,10 +41,21 @@ Description:    Approximate port of VectorCraft's Artwork Cleanup > Join Point T
                  SDK constraint as combine-point-text.js - no per-glyph position API - so this
                  is approximate, not pixel-exact; see join-point-text.md.
 
+                 The one real run-time setting (how close two pieces' vertical centres need to be
+                 to count as the same line) comes from a small dialog (Affinity's own Dialog API,
+                 /dialog.js) rather than a CONFIG edit - CONFIG.SAME_LINE_FRACTION below only
+                 supplies the value the dialog opens with. Loaded lazily inside main(), after the
+                 selection is captured, since requiring /dialog.js clears the live selection as a
+                 side effect (same convention as rejoin-path-pieces.js/simplify-anchors.js). Note
+                 for future maintenance: dialogs can't be driven by this project's own MCP test
+                 tool (it only runs in the native Scripts panel), so this wiring was checked
+                 carefully against /dialog.js's own source but not exercised live - test it for
+                 real before relying on it.
+
 Author:         Les Pruszynski (Middledot)
-Version:        1.0.0
+Version:        1.1.0
 Created:        04/11/2026
-Last updated:   04/11/2026
+Last updated:   05/11/2026
 Compatibility:  Affinity by Canva 3.3
 
 See join-point-text.md for the full guide.
@@ -62,7 +73,8 @@ Contact:        lpruszynski@middledot.com
 const CONFIG = {
     // Two pieces are on the same line when their boxes' vertical centres are within this
     // fraction of the smaller piece's box height - a stand-in for VectorCraft's 0.4 em baseline
-    // check, since box height is the closest thing to a font size this SDK exposes.
+    // check, since box height is the closest thing to a font size this SDK exposes. This is only
+    // the dialog's starting value - change it there each run, or here for a different default.
     SAME_LINE_FRACTION: 0.5,
     // How far apart two pieces' rotation/scale/shear may be and still count as "turned alike".
     TURN_TOLERANCE: 1e-4,
@@ -253,6 +265,19 @@ function main() {
 
     const roots = doc.selection.nodes.toArray();
     if (roots.length === 0) { alert('Please select two or more one-line point text objects'); return; }
+
+    // Loaded lazily, after the selection above is captured - requiring /dialog.js clears it.
+    const { Dialog, DialogResult } = require('/dialog.js');
+    const { UnitType } = require('/units.js');
+    const dlg = Dialog.create('Join Point Text');
+    const col = dlg.addColumn();
+    const grp = col.addGroup('Settings');
+    const sameLineEditor = grp.addUnitValueEditor(
+        'Same-line tolerance (fraction of line height)', UnitType.Number, UnitType.Number,
+        CONFIG.SAME_LINE_FRACTION, 0, 2
+    ).setShowPopupSlider(true);
+    if (dlg.runModal() !== DialogResult.Ok) return;
+    CONFIG.SAME_LINE_FRACTION = sameLineEditor.value;
 
     const result = buildCommand(doc, roots);
     if (!result.cmd) {

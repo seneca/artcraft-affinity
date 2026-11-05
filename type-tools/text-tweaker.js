@@ -33,8 +33,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ------------------------------------------------------------
 Script Name:    text-tweaker.js
 Description:    Approximate port of VectorCraft's Type Tools > Text Tweaker. Gives one character
-                 attribute to the selected text, letter by letter, from CONFIG.FROM to CONFIG.TO
-                 along CONFIG.SHAPE, as one undo step; the text stays live and editable. Not a
+                 attribute to the selected text, letter by letter, from a start value to an end
+                 value along a shape, as one undo step; the text stays live and editable. Not a
                  repackaged version of an existing Affinity command - VectorCraft's own source
                  notes even Illustrator has nothing like it.
 
@@ -43,20 +43,29 @@ Description:    Approximate port of VectorCraft's Type Tools > Text Tweaker. Giv
                  font and colour, just one character at a time here. Every mapping below was
                  confirmed live against a real text object before shipping: `height` is the
                  character's own size in points; `offsetY` moves its baseline (positive moves it
-                 down); `scaleX`/`scaleY` are fractions of 1.0, not percent, so CONFIG.FROM/TO for
-                 hScale/vScale (given in percent, matching VectorCraft's own units) are divided by
-                 100 before being written; `characterSpacing` is a fraction of the character's own
-                 em (1.0 = one full em of extra space), confirmed by measuring the exact width
-                 added per unit, so CONFIG.FROM/TO for tracking (given in VectorCraft's own units
-                 of 1/1000 em) are divided by 1000; `absoluteLeading` is in points directly.
+                 down); `scaleX`/`scaleY` are fractions of 1.0, not percent, so the From/To dialog
+                 values for hScale/vScale (given in percent, matching VectorCraft's own units) are
+                 divided by 100 before being written; `characterSpacing` is a fraction of the
+                 character's own em (1.0 = one full em of extra space), confirmed by measuring the
+                 exact width added per unit, so the From/To values for tracking (given in
+                 VectorCraft's own units of 1/1000 em) are divided by 1000; `absoluteLeading` is in
+                 points directly.
 
                  Story positions for TextSelection/getGlyphAtts are confirmed live to be plain
                  UTF-16 code-unit offsets, matching `node.text` indexing exactly - no byte-offset
                  conversion needed (unlike VectorCraft's own Rust implementation, which does use
                  UTF-8 byte offsets internally; this is specific to Affinity's own scripting SDK).
 
+                 Settings come from a dialog (Affinity's own Dialog API, /dialog.js) rather than a
+                 CONFIG object you edit by hand - CONFIG below only supplies the values the dialog
+                 opens with. Note for future maintenance: dialogs can't be driven by this project's
+                 own MCP test tool (it only runs in the native Scripts panel), so the dialog's
+                 wiring was checked carefully against /dialog.js and ts/ui.d.ts but not exercised
+                 live the way every other part of this script was - test it for real before
+                 relying on it.
+
 Author:         Les Pruszynski (Middledot)
-Version:        1.0.0
+Version:        1.1.0
 Created:        05/11/2026
 Last updated:   05/11/2026
 Compatibility:  Affinity by Canva 3.3
@@ -74,6 +83,8 @@ Contact:        lpruszynski@middledot.com
 // CONFIGURATION
 // ============================================================
 
+// These are only the values the dialog opens with - change them if you want different starting
+// defaults, but everything here can also be changed in the dialog each time the script runs.
 const CONFIG = {
     // "size" (pt) | "baselineShift" (pt) | "hScale" (%) | "vScale" (%) | "tracking" (1/1000 em,
     // VectorCraft's own units) | "leading" (pt). "rotation" and "strokeWidth" aren't included -
@@ -116,6 +127,14 @@ const ATTRIBUTES = {
     tracking: value => atts => { atts.characterSpacing = value / 1000; },
     leading: value => atts => { atts.absoluteLeading = value; },
 };
+const ATTRIBUTE_KEYS = Object.keys(ATTRIBUTES);
+const ATTRIBUTE_LABELS = [
+    'Size (pt)', 'Baseline shift (pt)', 'Horizontal scale (%)', 'Vertical scale (%)',
+    'Tracking (1/1000 em)', 'Leading (pt)',
+];
+
+const SHAPE_KEYS = ['straight', 'ease', 'bow', 'spike', 'random'];
+const SHAPE_LABELS = ['Straight', 'Ease', 'Bow', 'Spike', 'Random'];
 
 // ============================================================
 // SHAPES
@@ -134,8 +153,8 @@ function amount(shape, i, n, random) {
     }
 }
 
-// A small seeded PRNG (mulberry32) - deterministic for a given CONFIG.SEED, but not the same
-// sequence VectorCraft's own (different, undocumented) generator would produce for that seed.
+// A small seeded PRNG (mulberry32) - deterministic for a given seed, but not the same sequence
+// VectorCraft's own (different, undocumented) generator would produce for that seed.
 function makeRng(seed) {
     let a = (seed >>> 0) || 1;
     return function next() {
@@ -149,6 +168,46 @@ function makeRng(seed) {
 
 function isSkippable(ch) {
     return /\s/.test(ch) || ch.codePointAt(0) < 32;
+}
+
+// ============================================================
+// DIALOG
+// ============================================================
+
+// Shows the settings dialog pre-filled from `defaults`. Returns the chosen settings, or null if
+// the dialog was cancelled.
+//
+// Modules that clear the live selection when require()'d (/dialog among them) are loaded lazily,
+// after the selection is captured - see modern-js.md 2.1 in the affinity-scripts-toolkit. This is
+// why Dialog/DialogResult/UnitType aren't required at the top of the file: resolveTargets() must
+// read doc.selection before this function (and /dialog.js) is ever touched.
+function showDialog(defaults) {
+    const { Dialog, DialogResult } = require('/dialog.js');
+    const { UnitType } = require('/units.js');
+
+    const dialog = Dialog.create('Text Tweaker');
+    const col = dialog.addColumn();
+    const grp = col.addGroup('Settings');
+
+    const attributeIndex = Math.max(0, ATTRIBUTE_KEYS.indexOf(defaults.attribute));
+    const attributeBox = grp.addComboBox('Attribute', ATTRIBUTE_LABELS, attributeIndex);
+    const fromEditor = grp.addUnitValueEditor('From', UnitType.Number, UnitType.Number, defaults.from);
+    const toEditor = grp.addUnitValueEditor('To', UnitType.Number, UnitType.Number, defaults.to);
+    const shapeIndex = Math.max(0, SHAPE_KEYS.indexOf(defaults.shape));
+    const shapeBox = grp.addComboBox('Shape', SHAPE_LABELS, shapeIndex);
+    const seedEditor = grp.addUnitValueEditor('Random seed (Shape = Random only)', UnitType.Number, UnitType.Number, defaults.seed);
+    const skipSpacesBox = grp.addCheckBox('Skip spaces and line breaks', defaults.skipSpaces);
+
+    if (dialog.runModal() !== DialogResult.Ok) return null;
+
+    return {
+        attribute: ATTRIBUTE_KEYS[attributeBox.selectedIndex],
+        from: fromEditor.value,
+        to: toEditor.value,
+        shape: SHAPE_KEYS[shapeBox.selectedIndex],
+        seed: Math.trunc(seedEditor.value) || 0,
+        skipSpaces: skipSpacesBox.value,
+    };
 }
 
 // ============================================================
@@ -225,29 +284,23 @@ function main() {
     const doc = Document.current;
     if (!doc) { alert('This script requires an open document'); return; }
 
-    const makeApply = ATTRIBUTES[CONFIG.ATTRIBUTE];
-    if (!makeApply) {
-        alert('CONFIG.ATTRIBUTE must be one of: ' + Object.keys(ATTRIBUTES).join(', '));
-        return;
-    }
-    const cfg = {
-        from: Number(CONFIG.FROM),
-        to: Number(CONFIG.TO),
-        shape: ['straight', 'ease', 'bow', 'spike', 'random'].includes(CONFIG.SHAPE) ? CONFIG.SHAPE : 'straight',
-        seed: Math.trunc(Number(CONFIG.SEED)) || 0,
-        skipSpaces: CONFIG.SKIP_SPACES !== false,
-    };
-    if (!isFinite(cfg.from) || !isFinite(cfg.to)) {
-        alert('CONFIG.FROM and CONFIG.TO must both be numbers.');
-        return;
-    }
-
     const targets = resolveTargets(doc);
     if (targets.length === 0) {
         alert('Select one or more type objects first, or place the Type tool\'s cursor in one.');
         return;
     }
 
+    const cfg = showDialog({
+        attribute: ATTRIBUTES[CONFIG.ATTRIBUTE] ? CONFIG.ATTRIBUTE : ATTRIBUTE_KEYS[0],
+        from: isFinite(Number(CONFIG.FROM)) ? Number(CONFIG.FROM) : 0,
+        to: isFinite(Number(CONFIG.TO)) ? Number(CONFIG.TO) : 0,
+        shape: SHAPE_KEYS.includes(CONFIG.SHAPE) ? CONFIG.SHAPE : SHAPE_KEYS[0],
+        seed: Math.trunc(Number(CONFIG.SEED)) || 0,
+        skipSpaces: CONFIG.SKIP_SPACES !== false,
+    });
+    if (!cfg) return;
+
+    const makeApply = ATTRIBUTES[cfg.attribute];
     const builder = CompoundCommandBuilder.create();
     let totalChanged = 0;
     for (const { node, start, end } of targets) {
@@ -255,7 +308,7 @@ function main() {
     }
 
     if (totalChanged === 0) {
-        alert('Nothing to change - there were no characters in range (after skipping spaces, if CONFIG.SKIP_SPACES is on).');
+        alert('Nothing to change - there were no characters in range (after skipping spaces, if that option is on).');
         return;
     }
 

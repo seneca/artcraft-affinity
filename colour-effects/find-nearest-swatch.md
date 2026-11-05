@@ -10,6 +10,8 @@ distinct colour in your **selection** - a report only; nothing changes.
    **Run** - or, to keep it around, click **Save As...** to save it to the
    Script Library (**Window > Scripting > Script Library**), then click it
    there to run it any time.
+3. A dialog opens for the settings below - change what you want and click
+   **OK**, or **Cancel** to back out without changing anything.
 
 ## Purpose
 
@@ -39,7 +41,8 @@ using instead?"), just without needing named swatches to ask it.
 
 ## Features
 
-- **No dialog** — select your objects and run it
+- **A settings dialog** — select your objects, run it, and a dialog opens
+  pre-filled with `CONFIG`'s values
 - **Checks fills, strokes and character-level text colour**, the same
   reach `print-ink-fixes.js` has
 - **ΔE under ~1 is essentially imperceptible, ~2-3 is a close match** - a
@@ -66,7 +69,15 @@ using instead?"), just without needing named swatches to ask it.
   own tool leaving them out of its own colour matching.
 - **Gradient meshes aren't looked at** - only a solid colour or a plain
   gradient's stops.
+- **The dialog couldn't be tested the way this project's other scripts
+  are** - Affinity's scripting SDK's dialogs only run in the native
+  Scripts panel, not through this project's own MCP-based test tool, so
+  this one was checked carefully against the SDK's own source rather than
+  run live before shipping. Flag it if it misbehaves.
 
 ## Changelog
 
+1.1.0 - Replaced the CONFIG-only workflow with a settings dialog (opens
+pre-filled from CONFIG's values); CONFIG now only sets the dialog's
+defaults.
 1.0.0 - Initial version.

@@ -50,8 +50,15 @@ Description:    Port of VectorCraft's Artwork Cleanup > Replace Missing Fonts. S
                  metric between two fonts - confirmed it correctly prefers an available family's
                  "Regular" style over its others for an unstyled missing font.
 
+                 The replacement font name comes from a small dialog (Affinity's own Dialog API,
+                 /dialog.js) rather than a CONFIG edit - CONFIG.REPLACEMENT_FONT below only
+                 supplies the text the dialog opens with. Note for future maintenance: dialogs
+                 can't be driven by this project's own MCP test tool (it only runs in the native
+                 Scripts panel), so this wiring was checked carefully against /dialog.js's own
+                 source but not exercised live - test it for real before relying on it.
+
 Author:         Les Pruszynski (Middledot)
-Version:        1.0.0
+Version:        1.1.0
 Created:        05/11/2026
 Last updated:   05/11/2026
 Compatibility:  Affinity by Canva 3.3
@@ -70,8 +77,9 @@ Contact:        lpruszynski@middledot.com
 
 const CONFIG = {
     // The font family every missing font is replaced with - must be actually installed. Arial
-    // is close to universally available on both macOS and Windows; change this to any family
-    // name FontFamily.all reports if you'd rather use something else.
+    // is close to universally available on both macOS and Windows. This is only the dialog's
+    // starting value - type a different family name there each run, or change this for a
+    // different default.
     REPLACEMENT_FONT: 'Arial',
 };
 
@@ -176,10 +184,18 @@ function main() {
     const doc = Document.current;
     if (!doc) { alert('This script requires an open document'); return; }
 
-    const family = FontFamily.all.find(f => f.name === CONFIG.REPLACEMENT_FONT);
+    const { Dialog, DialogResult } = require('/dialog.js');
+    const dlg = Dialog.create('Replace Missing Fonts');
+    const col = dlg.addColumn();
+    const grp = col.addGroup('Settings');
+    const fontBox = grp.addTextBox('Replacement font family', CONFIG.REPLACEMENT_FONT);
+    if (dlg.runModal() !== DialogResult.Ok) return;
+    const replacementFont = fontBox.text;
+
+    const family = FontFamily.all.find(f => f.name === replacementFont);
     if (!family || family.fontCount === 0) {
-        alert('The replacement font "' + CONFIG.REPLACEMENT_FONT + '" is not available on this ' +
-            'system - edit CONFIG.REPLACEMENT_FONT at the top of the script to a font that is.');
+        alert('The replacement font "' + replacementFont + '" is not available on this system - ' +
+            'run it again with a family name that is.');
         return;
     }
     const replacementFonts = family.fonts;
@@ -205,7 +221,7 @@ function main() {
     doc.executeCommand(builder.createCommand());
     alert('Replaced ' + runCount + ' run' + (runCount === 1 ? '' : 's') + ' of missing font' +
         (runCount === 1 ? '' : 's') + ' across ' + nodeCount + ' object' + (nodeCount === 1 ? '' : 's') +
-        ' with "' + CONFIG.REPLACEMENT_FONT + '".');
+        ' with "' + replacementFont + '".');
 }
 
 try {
