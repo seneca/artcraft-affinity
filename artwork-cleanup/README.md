@@ -26,6 +26,7 @@ external dependencies. For any script in this folder:
 | [`combine-point-text.js`](combine-point-text.md) | Merges one-line point text objects that sit side by side into as few objects as it can. Approximate - see its guide. |
 | [`join-point-text.js`](join-point-text.md) | Joins one-line point text objects into a single multi-line paragraph, left-aligned. Approximate - see its guide. |
 | [`break-into-lines.js`](break-into-lines.md) | Splits a Frame Text or Artistic Text object into one-line Artistic Text pieces, one per line - including auto-wrapped lines. Approximate - see its guide. |
+| [`break-into-paragraphs.js`](break-into-paragraphs.md) | Splits a Frame Text or Artistic Text object into one Artistic Text object per paragraph, keeping each paragraph's own wrapped lines inside it. Approximate - see its guide. |
 
 See each script's own `.md` guide (linked above) for its full Purpose, How
 it works, Features, Usage tips, Known limitations, and Changelog.
