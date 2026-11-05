@@ -29,6 +29,7 @@ external dependencies. For any script in this folder:
 | [`break-into-paragraphs.js`](break-into-paragraphs.md) | Splits a Frame Text or Artistic Text object into one object per paragraph - a same-width Frame Text box per paragraph for a Frame Text source, an Artistic Text object per paragraph for an Artistic Text source. Approximate - see its guide. |
 | [`break-into-words.js`](break-into-words.md) | Splits a Frame Text or Artistic Text object into one Artistic Text object per word, including placing each word correctly within its own line. Approximate - see its guide. |
 | [`break-into-glyphs.js`](break-into-glyphs.md) | Splits a Frame Text or Artistic Text object into one Artistic Text object per rendered glyph (Unicode grapheme cluster). Approximate - see its guide. |
+| [`split-text-at-cursor.js`](split-text-at-cursor.md) | While a Type tool cursor or selection sits in a Frame Text or Artistic Text object, splits it into pieces at that point. Approximate - see its guide. |
 
 See each script's own `.md` guide (linked above) for its full Purpose, How
 it works, Features, Usage tips, Known limitations, and Changelog.
