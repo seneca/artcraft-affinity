@@ -11,10 +11,9 @@ as one undo step. Does not touch **Frame Text**.
    Script Library (**Window > Scripting > Script Library**), then click it
    there to run it any time.
 3. A small dialog opens for the one setting below, previewing the actual
-   join live on the real objects as you type a new value - click **OK**
-   to keep it, or **Cancel** to back out without joining anything. (No
-   draggable slider - Affinity's own slider widget doesn't trigger a
-   live preview, so this is a plain numeric field.)
+   join live on the real objects as you drag the slider or type a new
+   value - click **OK** to keep it, or **Cancel** to back out without
+   joining anything.
 
 ## Purpose
 
@@ -62,7 +61,8 @@ why.
 
 - **A same-line tolerance dialog with a live preview** — opens pre-filled
   with `CONFIG`'s value, and redraws the actual joined object on the
-  canvas as you type a new value, before you ever click OK
+  canvas as you drag the slider or type a new value, before you ever
+  click OK
 - **Keeps character styling** — each piece's own font, size, colour and
   tracking survive
 - **Rebuilds real paragraph structure**: actual line breaks, left alignment,
@@ -104,15 +104,15 @@ no per-glyph position API in the Affinity SDK:
   documented in `combine-point-text.md`.
 - **A cap of 5,000 objects** across the selection refuses to run rather than
   let a pathologically large selection hang.
-- **No draggable slider on the tolerance field** - confirmed directly
-  (by the user, live): Affinity's popup slider widget doesn't trigger a
-  live preview while being dragged, even though typing a value does, so
-  this uses a plain numeric field instead.
 
 ## Changelog
 
-1.2.1 - Removed the tolerance field's popup slider - confirmed it didn't
-trigger the live preview while being dragged; typing a value still does.
+1.2.2 - Restored the tolerance field's popup slider (briefly removed in
+1.2.1) - the real cause of the live preview appearing not to work
+turned out to be a bug in vector-halftone.js's dialog, not a general
+problem with popup sliders; see that script's own changelog.
+1.2.1 - (superseded) Removed the tolerance field's popup slider,
+believing dragging one didn't trigger the live preview.
 1.2.0 - The dialog now live-previews the actual join on the real objects
 as you change the tolerance, instead of only applying it after clicking OK.
 1.1.0 - Replaced the CONFIG-only workflow for the same-line tolerance with a

@@ -58,23 +58,26 @@ Description:    Approximate port of VectorCraft's Colour Effects > Vector Halfto
                  CONFIG object you edit by hand - CONFIG below only supplies the values the dialog
                  opens with. Confirmed directly via this project's own test tool: an add-nodes-
                  plus-delete-original compound (what this script builds) reverts cleanly from a
-                 preview, same as a plain add, so it's safe to live-preview. The render-and-sample
-                 pass itself is too expensive to want on every tick of a slider drag (it can mean
-                 thousands of cells, each sampled from a freshly rendered bitmap) - the original
-                 design used a `transient`-flag-based split (a cheap grid-math estimate while
-                 dragging, the full preview on release) to cope with that, but Frequency/Angle's
-                 popup sliders were removed entirely after the user confirmed, live, that dragging
-                 one didn't trigger a live preview at all, even though typing a value does; the
-                 transient-based cheap/expensive split in the code below is dead weight now (no
-                 slider means no drag to throttle) but harmless, and is left in case a future SDK
-                 change makes sliders behave as originally assumed. Note for future maintenance:
-                 the dialog UI itself still can't be driven by this project's own MCP test tool (it
-                 only runs in the native Scripts panel), so its controls and wiring were checked
-                 carefully against /dialog.js and ts/ui.d.ts but not exercised live - test it for
-                 real before relying on it.
+                 preview, same as a plain add, so it's safe to live-preview. Every change
+                 recomputes the full render-and-sample pass and previews it immediately, the same
+                 unconditional update-on-every-change pattern this project's arrange-tools scripts
+                 (arrange-in-grid.js, randomize-opacity.js) already use - an earlier version of
+                 this script instead gated the real preview behind the dialog's `transient` flag
+                 (meant to skip the expensive render while a slider was being dragged, running it
+                 only "on release"), but that gating turned out to be the actual bug behind Mono/
+                 CMYK's Frequency/Angle sliders appearing to do nothing at all: `transient` may be
+                 true for any slider interaction, not just a continuous drag, so the real preview
+                 was being suppressed outright. Removed entirely in favour of the simpler, proven
+                 pattern; planSampling()'s MAX_CELLS/MAX_SAMPLE_PIXELS caps are what actually
+                 protect against a frequency too fine for the object's size turning this into a
+                 hang, not the removed throttling. Note for future maintenance: the dialog UI
+                 itself still can't be driven by this project's own MCP test tool (it only runs in
+                 the native Scripts panel), so its controls and wiring were checked carefully
+                 against /dialog.js and ts/ui.d.ts but not exercised live - test it for real before
+                 relying on it.
 
 Author:         Les Pruszynski (Middledot)
-Version:        1.2.1
+Version:        1.3.0
 Created:        05/11/2026
 Last updated:   05/11/2026
 Compatibility:  Affinity by Canva 3.3
@@ -177,22 +180,15 @@ function buildDialog(Dialog, UnitType, defaults) {
 
     const shapeIndex = Math.max(0, SHAPE_KEYS.indexOf(defaults.shape));
     dlg.shapeBox = grp.addComboBox('Dot shape', SHAPE_LABELS, shapeIndex);
-    // No popup slider: confirmed directly by the user that dragging one doesn't fire the live-
-    // preview handler at all, even though typing a value does - plain editors are used here so
-    // the live preview actually works, at the cost of the slider's drag affordance. Without a
-    // slider to drag, every change is really a discrete, committed edit - the transient-based
-    // throttling below still applies in case that ever isn't true, but in practice every change
-    // now likely runs the full (expensive) preview rather than the cheap estimate.
-    dlg.frequencyEditor = grp.addUnitValueEditor('Frequency (lines per inch)', UnitType.Number, UnitType.Number, defaults.frequency, 1, 300);
-    dlg.angleEditor = grp.addUnitValueEditor('Angle (degrees)', UnitType.Degree, UnitType.Degree, defaults.angleDeg);
+    dlg.frequencyEditor = grp.addUnitValueEditor('Frequency (lines per inch)', UnitType.Number, UnitType.Number, defaults.frequency, 1, 300).setShowPopupSlider(true);
+    dlg.angleEditor = grp.addUnitValueEditor('Angle (degrees)', UnitType.Degree, UnitType.Degree, defaults.angleDeg).setShowPopupSlider(true);
     const modeIndex = Math.max(0, MODE_KEYS.indexOf(defaults.mode));
     dlg.modeBox = grp.addComboBox('Mode', MODE_LABELS, modeIndex);
     dlg.colorPicker = grp.addColourPicker('Dot colour (Mono mode only, ignored if "from art" is on)', defaults.color);
     dlg.fromArtBox = grp.addCheckBox('Mono mode: take each dot\'s colour from the art underneath', defaults.fromArt);
     dlg.invertBox = grp.addCheckBox('Invert (dots for light tones instead of dark)', defaults.invert);
     dlg.keepOriginalBox = grp.addCheckBox('Keep the original object', defaults.keepOriginal);
-    // Live-updated from main() - see the note there on why this is a cheap status line rather
-    // than a full geometry preview while a slider is actively being dragged.
+    // Live-updated from main() with the real dot/layer count on every change.
     dlg.status = grp.addStaticText(' ', ' ').setIsFullWidth(true);
 
     return dlg;
@@ -474,17 +470,6 @@ function buildHalftoneCommand(doc, node, bounds, cfg) {
     return { cmd: compound.createCommand(), totalDots, layerCount: layers.length, reason: null };
 }
 
-// A cheap (no rendering) estimate of how many cells the current frequency/angle would produce -
-// just the same grid math planSampling already does, used for the status line while a slider is
-// actively being dragged, see main()'s note.
-function cheapCellEstimate(bounds, cfg) {
-    const cell = 72 / clamp(cfg.frequency, 1, 300);
-    const cellsEstimate = Math.pow(bounds.width + bounds.height, 2) / 2 / (cell * cell);
-    if (cellsEstimate > MAX_CELLS) return 'Too many dots for this size - lower the frequency.';
-    return '~' + Math.round(cellsEstimate) + ' cell' + (Math.round(cellsEstimate) === 1 ? '' : 's') +
-        ' at this frequency (release the slider to preview the actual dots).';
-}
-
 // ============================================================
 // RUN
 // ============================================================
@@ -521,12 +506,14 @@ function main() {
         keepOriginal: !!CONFIG.KEEP_ORIGINAL,
     });
 
-    // The full render-and-sample pass is too expensive to run on every tick of a slider drag (it
-    // can involve thousands of cells, each sampled from a real rendered bitmap) - it only runs on
-    // a committed change (transient === false: a slider release, or any discrete control like a
-    // combo box or checkbox, which only ever report a single committed change). While a slider is
-    // actively being dragged (transient === true), only the cheap grid-math estimate updates, and
-    // the canvas keeps showing the last committed preview rather than flickering.
+    // Recomputes the full render-and-sample pass and previews it, on every dialog change - the
+    // same unconditional update(true)-on-every-change pattern arrange-in-grid.js/
+    // randomize-opacity.js use, rather than the transient-gated "only on commit" split this had
+    // before: that gating turned out to be the actual bug behind sliders appearing to do nothing
+    // (see the file header) - it suppressed the real preview whenever a slider reported
+    // transient === true, which may be for any interaction, not just a continuous drag. The
+    // MAX_CELLS/MAX_SAMPLE_PIXELS caps in planSampling() still protect against a frequency too
+    // fine for the object's size turning this into a hang.
     let last = { cmd: null, totalDots: 0, layerCount: 0, reason: null };
     const update = (preview) => {
         const cfg = readOptions(dlg, defaultColor);
@@ -542,13 +529,7 @@ function main() {
         return last;
     };
 
-    dlg.onControlValueChangedHandler = (transient) => {
-        if (transient) {
-            dlg.status.text = cheapCellEstimate(bounds, readOptions(dlg, defaultColor));
-        } else {
-            update(true);
-        }
-    };
+    dlg.onControlValueChangedHandler = () => update(true);
     update(true);
 
     if (dlg.runModal() === DialogResult.Ok) {

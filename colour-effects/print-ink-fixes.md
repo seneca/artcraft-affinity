@@ -105,9 +105,13 @@ at once, across everything you choose.
 
 ## Changelog
 
-1.2.1 - The ink-limit/overprint-black fields have no popup slider -
-confirmed directly (by the user, live) that dragging one didn't trigger
-the live preview, even though typing a value does.
+1.2.2 - Restored the ink-limit/overprint-black fields' popup sliders
+(briefly removed in 1.2.1) - the real cause of the live preview
+appearing not to work turned out to be a bug in vector-halftone.js's
+dialog, not a general problem with popup sliders; see that script's own
+changelog.
+1.2.1 - (superseded) Removed the ink-limit/overprint-black fields'
+popup sliders, believing dragging one didn't trigger the live preview.
 1.2.0 - The dialog now live-previews every fix on the real artwork as you
 change any setting, instead of only applying it after clicking OK.
 1.1.0 - Replaced the CONFIG-only workflow with a settings dialog (opens

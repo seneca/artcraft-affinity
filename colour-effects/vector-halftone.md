@@ -11,12 +11,11 @@ own tone, as one undo step.
    Script Library (**Window > Scripting > Script Library**), then click it
    there to run it any time.
 3. A dialog opens for the settings below, previewing the actual dots
-   live as you change anything. Frequency and Angle are plain numeric
-   fields, not draggable sliders - Affinity's own slider widget doesn't
-   trigger a live preview, confirmed directly - so each full keystroke
-   re-renders the dots; typing a new value a digit at a time may feel a
-   little slower than dragging would have. Click **OK** to keep it, or
-   **Cancel** to back out without changing anything.
+   live as you change anything, including dragging Frequency or Angle's
+   slider - each change re-renders the dots from scratch, so a very
+   fine frequency over a large object may feel a little slow to
+   preview. Click **OK** to keep it, or **Cancel** to back out without
+   changing anything.
 
 ## Purpose
 
@@ -94,12 +93,12 @@ is in each cell of a grid turned by your chosen screen angle.
   else in the selection - there's no separate "image couldn't be decoded"
   warning the way VectorCraft's own tool gives; a render that comes out
   blank there would still just sample as blank here.
-- **No draggable slider on Frequency or Angle** - confirmed directly (by
-  the user, live): Affinity's popup slider widget doesn't trigger a live
-  preview while being dragged, even though typing a value does, so this
-  uses plain numeric fields instead. Each keystroke re-renders the full
-  halftone, which can feel a little slow while a new value is still
-  being typed.
+- **Every change re-renders the full halftone from scratch**, including
+  each tick of a slider drag - there's no cheaper "quick estimate while
+  dragging" fallback (an earlier version tried that, gated on the
+  dialog's `transient` flag, but that gating was itself the bug behind
+  the live preview appearing not to work at all - see the Changelog).
+  Dragging Frequency on a large, detailed object may feel sluggish.
 - **The dialog UI itself couldn't be tested the way this project's other
   scripts are** - Affinity's scripting SDK's dialogs only run in the
   native Scripts panel, not through this project's own MCP-based test
@@ -111,10 +110,18 @@ is in each cell of a grid turned by your chosen screen angle.
 
 ## Changelog
 
-1.2.1 - Removed Frequency/Angle's popup sliders - confirmed they didn't
-trigger the live preview while being dragged; typing a value still does.
-Every change now re-renders the full halftone (no more cheap drag-time
-estimate, since there's no more dragging).
+1.3.0 - Found and fixed the real bug behind the live preview appearing
+not to work: the dialog gated the real preview behind the `transient`
+flag, meant to skip the expensive render while a slider was being
+dragged and only run it "on release" - but `transient` may be true for
+any slider interaction, not just a continuous drag, so the real preview
+was being suppressed outright. Removed that gating entirely; every
+change now re-renders the full halftone immediately, the same way
+every other live-previewing script in this project already works.
+Frequency/Angle's popup sliders (briefly removed in 1.2.1, believing
+sliders themselves were the problem) are restored.
+1.2.1 - (superseded) Removed Frequency/Angle's popup sliders, believing
+sliders themselves didn't trigger the live preview.
 1.2.0 - The dialog now live-previews the actual dots as you change any
 setting.
 1.1.0 - Replaced the CONFIG-only workflow with a settings dialog (opens
