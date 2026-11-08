@@ -48,7 +48,7 @@ Description:    Ported from VectorCraft's 3D Box tool. Creates a rotatable 3D bo
 See box-3d.md for the full guide.
 
 Author:         Les Pruszynski (Middledot)
-Version:        1.0.0
+Version:        1.0.1
 Created:        08/11/2026
 Last updated:   08/11/2026
 Compatibility:  Affinity by Canva 3.3
@@ -243,6 +243,7 @@ function buildDialog(Dialog, UnitType, doc) {
     const size = col.addGroup("Size");
     dlg.width = size.addUnitValueEditor("Width:", UnitType.Point, doc.units, CONFIG.DEFAULT_SIZE_PT, CONFIG.SIZE_MIN_PT, CONFIG.SIZE_MAX_PT).setShowPopupSlider(true);
     dlg.height = size.addUnitValueEditor("Height:", UnitType.Point, doc.units, CONFIG.DEFAULT_SIZE_PT, CONFIG.SIZE_MIN_PT, CONFIG.SIZE_MAX_PT).setShowPopupSlider(true);
+    dlg.lock = size.addCheckBox("Lock Width and Height", false).setIsFullWidth(true);
 
     const rotation = col.addGroup("Rotation");
     dlg.angleX = rotation.addUnitValueEditor("Angle X:", UnitType.Degree, UnitType.Degree, CONFIG.DEFAULT_ANGLE_X, CONFIG.ANGLE_MIN, CONFIG.ANGLE_MAX).setShowPopupSlider(true);
@@ -255,6 +256,30 @@ function buildDialog(Dialog, UnitType, doc) {
     dlg.parallelZ = projection.addCheckBox("Parallel Z", true).setIsFullWidth(true);
 
     return dlg;
+}
+
+// Keeps Width and Height at whatever ratio they had the moment Lock Width and Height was last
+// turned on (or last left alone) - not a ratio fixed at dialog-open time. `state.prevWidth`/
+// `prevHeight` are the fields' own values as of the end of the previous call, so comparing the
+// current ones against them tells which field (if either) the user just actually changed; this
+// also means toggling the checkbox on by itself changes nothing and simply adopts the current
+// ratio from then on, same as a typical link-icon control elsewhere. Only one of width/height is
+// ever rewritten per call, since only one control's change fires a given onControlValueChangedHandler
+// call - writing dlg.height.value (or dlg.width.value) here recurses into this same handler, which
+// main()'s reentrancy guard around the whole update() call (not just this function) absorbs.
+function applyLock(dlg, state) {
+    if (!dlg.lock.value) {
+        state.prevWidth = dlg.width.value;
+        state.prevHeight = dlg.height.value;
+        return;
+    }
+    const w = dlg.width.value, h = dlg.height.value;
+    if (w !== state.prevWidth && state.prevWidth > 1e-9)
+        dlg.height.value = Math.max(CONFIG.SIZE_MIN_PT, Math.min(CONFIG.SIZE_MAX_PT, state.prevHeight * (w / state.prevWidth)));
+    else if (h !== state.prevHeight && state.prevHeight > 1e-9)
+        dlg.width.value = Math.max(CONFIG.SIZE_MIN_PT, Math.min(CONFIG.SIZE_MAX_PT, state.prevWidth * (h / state.prevHeight)));
+    state.prevWidth = dlg.width.value;
+    state.prevHeight = dlg.height.value;
 }
 
 function readOptions(dlg) {
@@ -283,13 +308,27 @@ function main() {
     const { UnitType } = require('/units.js');
     const dlg = buildDialog(Dialog, UnitType, doc);
 
+    // Guards applyLock's own dlg.width.value/dlg.height.value writes, each of which fires
+    // onControlValueChangedHandler again - without this, the second call's write would trigger a
+    // third, and so on.
+    let updating = false;
+    const lockState = { prevWidth: dlg.width.value, prevHeight: dlg.height.value };
+
     const update = (preview) => {
-        const cmd = buildCommand(doc, centre, readOptions(dlg));
-        if (cmd)
-            doc.executeCommand(cmd, preview);
-        else
-            doc.clearPreviews();
-        return cmd;
+        if (updating)
+            return null;
+        updating = true;
+        try {
+            applyLock(dlg, lockState);
+            const cmd = buildCommand(doc, centre, readOptions(dlg));
+            if (cmd)
+                doc.executeCommand(cmd, preview);
+            else
+                doc.clearPreviews();
+            return cmd;
+        } finally {
+            updating = false;
+        }
     };
 
     dlg.onControlValueChangedHandler = () => update(true);

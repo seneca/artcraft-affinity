@@ -59,6 +59,10 @@ default position (see Features) instead of wherever you happened to drag.
 ## Features
 
 - **Width** / **Height** fields — the box's overall silhouette size
+- **Lock Width and Height** checkbox (not part of VectorCraft - its tool has no numeric fields to
+  link, since size comes from a drag gesture) - while on, changing either field rescales the other
+  to keep whatever ratio was active the moment the checkbox was last turned on (or last left alone),
+  the same way a link-icon control works elsewhere
 - **Angle X / Angle Y / Angle Z** (-180°..180°) — rotates the cube about
   each axis in turn, X then Y then Z; defaults (30°, 35°, 0°) match
   VectorCraft's own tool defaults
@@ -105,5 +109,9 @@ default position (see Features) instead of wherever you happened to drag.
   original, not physical accuracy.
 
 ## Changelog
+
+1.0.1 - Added Lock Width and Height, a link-icon-style checkbox not present in VectorCraft's own
+tool (which has no numeric fields to link). While on, changing either field rescales the other to
+preserve whatever ratio was active the moment the checkbox was last turned on.
 
 1.0.0 - Initial version.
