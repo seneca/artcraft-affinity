@@ -45,6 +45,11 @@ Description:    Ported from VectorCraft's 3D Box tool. Creates a rotatable 3D bo
                  current spread's own centre (its first artboard if none is there, or the spread
                  itself if it has no artboards at all).
 
+                 Lock Width and Height is not part of VectorCraft's own tool (which has no numeric
+                 fields to link, since its size comes from a drag gesture) - added here as a
+                 link-icon-style checkbox: while on, changing either field rescales the other to
+                 keep whatever ratio was active the moment it was last turned on.
+
 See box-3d.md for the full guide.
 
 Author:         Les Pruszynski (Middledot)

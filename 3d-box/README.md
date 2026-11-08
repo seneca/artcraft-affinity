@@ -15,13 +15,19 @@ pseudo-3D box, drawn as a single flat-faced object.
 
 | Script | What it does |
 |---|---|
-| [`box-3d.js`](box-3d.md) | Creates a rotatable 3D box as a single object, with Angle X/Y/Z rotation and per-axis parallel/perspective projection. |
+| [`box-3d.js`](box-3d.md) | Creates a rotatable 3D box as a single object, with Angle X/Y/Z rotation, per-axis parallel/perspective projection, and a Width/Height lock. |
 
 VectorCraft's original 3D Box is a draggable canvas tool with no dialog of
 its own; Affinity's scripting SDK has no equivalent of a custom draggable
 tool, so this is a dialog with the same parameters instead, live-previewed,
 committed as one undo step. See [`box-3d.md`](box-3d.md) for the full
 breakdown of why, and the geometry it faithfully ports.
+
+**Lock Width and Height is not part of VectorCraft's own tool** — added in
+this port as a link-icon-style checkbox, since VectorCraft's tool has no
+numeric width/height fields to link in the first place (its size comes
+from a drag gesture, not typed values). Everything else in `box-3d.js` is
+a faithful port of VectorCraft's own geometry and parameters.
 
 ## Files
 
